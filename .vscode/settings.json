@@ -1,7 +1,0 @@
-{
-    "files.associations": {
-        "*.rmd": "markdown",
-        "*.sass": "scss",
-        ".anm2": "xml"
-    }
-}
