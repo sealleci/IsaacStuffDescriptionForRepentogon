@@ -57,78 +57,6 @@ function Renderer:GetDescription(itemID)
     return result
 end
 
-function Renderer:RenderCursor(slot, firstColumnNumber)
-    local position = slot.Position - Vector(
-        (firstColumnNumber - 1) * SHARED_CONFIG.ITEM_DISPLAY_STEP_X,
-        0
-    )
-
-    Isaac.DrawQuad(
-        position - CONFIG.CURSOR_SIZE,
-        position + Vector(CONFIG.CURSOR_SIZE.X, -CONFIG.CURSOR_SIZE.Y),
-        position + Vector(-CONFIG.CURSOR_SIZE.X, CONFIG.CURSOR_SIZE.Y),
-        position + CONFIG.CURSOR_SIZE,
-        KColor(1, 1, 1, 1),
-        1
-    )
-end
-
-function Renderer:RenderDescription(slot)
-    local desc = self:GetDescription(slot.ID)
-
-    if not desc then
-        return
-    end
-
-    local renderPosition = self:GetScreenCenter() + CONFIG.DESCRIPTION_OFFSET
-    local prevScale = self.EID.Scale
-    local prevTextboxWidth = self.EID.Config["TextboxWidth"]
-    local prevInsideItemReminder = self.EID.InsideItemReminder
-
-    self.EID.Scale = CONFIG.DESCRIPTION_SCALE
-    self.EID.Config["TextboxWidth"] = CONFIG.DESCRIPTION_WIDTH
-    self.EID.InsideItemReminder = true
-
-    local success, err = pcall(function()
-        local textScale = Vector(
-            self.EID.Scale,
-            self.EID.Scale
-        )
-
-        if desc.Name and desc.Name ~= "" then
-            local nameColor = self.EID:getNameColor()
-
-            self.EID:renderString(
-                desc.Name,
-                renderPosition,
-                textScale,
-                nameColor
-            )
-            renderPosition.Y = renderPosition.Y + self.EID.lineHeight * self.EID.Scale
-        end
-
-        if desc.Description and desc.Description ~= "" then
-            self.EID:printBulletPoints(
-                desc.Description,
-                renderPosition,
-                desc.IgnoreBulletPointIconConfig
-            )
-        end
-    end)
-
-    self.EID.Scale = prevScale
-    self.EID.Config["TextboxWidth"] = prevTextboxWidth
-    self.EID.InsideItemReminder = prevInsideItemReminder
-
-    if not success then
-        Isaac.ConsoleOutput(
-            "[MSD4R] EID rendering error: "
-            .. tostring(err)
-            .. "\n"
-        )
-    end
-end
-
 function Renderer:RenderItemIcon(
     itemID,
     position
@@ -220,6 +148,78 @@ function Renderer:RenderMyStaffPage(
         if renderedItemCount >= MAX_ITEM_COUNT then
             break
         end
+    end
+end
+
+function Renderer:RenderCursor(slot, firstColumnNumber)
+    local position = slot.Position - Vector(
+        (firstColumnNumber - 1) * SHARED_CONFIG.ITEM_DISPLAY_STEP_X,
+        0
+    )
+
+    Isaac.DrawQuad(
+        position - CONFIG.CURSOR_SIZE,
+        position + Vector(CONFIG.CURSOR_SIZE.X, -CONFIG.CURSOR_SIZE.Y),
+        position + Vector(-CONFIG.CURSOR_SIZE.X, CONFIG.CURSOR_SIZE.Y),
+        position + CONFIG.CURSOR_SIZE,
+        KColor(1, 1, 1, 1),
+        1
+    )
+end
+
+function Renderer:RenderDescription(slot)
+    local description = self:GetDescription(slot.ID)
+
+    if not description then
+        return
+    end
+
+    local renderPosition = self:GetScreenCenter() + CONFIG.DESCRIPTION_OFFSET
+    local prevScale = self.EID.Scale
+    local prevTextboxWidth = self.EID.Config["TextboxWidth"]
+    local prevInsideItemReminder = self.EID.InsideItemReminder
+
+    self.EID.Scale = CONFIG.DESCRIPTION_SCALE
+    self.EID.Config["TextboxWidth"] = CONFIG.DESCRIPTION_WIDTH
+    self.EID.InsideItemReminder = true
+
+    local success, err = pcall(function()
+        local textScale = Vector(
+            self.EID.Scale,
+            self.EID.Scale
+        )
+
+        if description.Name and description.Name ~= "" then
+            local nameColor = self.EID:getNameColor()
+
+            self.EID:renderString(
+                description.Name,
+                renderPosition,
+                textScale,
+                nameColor
+            )
+            renderPosition.Y = renderPosition.Y + self.EID.lineHeight * self.EID.Scale
+        end
+
+        if description.Description and description.Description ~= "" then
+            self.EID:printBulletPoints(
+                description.Description,
+                renderPosition,
+                description.IgnoreBulletPointIconConfig
+            )
+        end
+    end)
+
+    self.EID.Scale = prevScale
+    self.EID.Config["TextboxWidth"] = prevTextboxWidth
+    self.EID.InsideItemReminder = prevInsideItemReminder
+
+    if not success then
+        Isaac.ConsoleOutput(
+            "[MSD4R] EID rendering error: "
+            .. tostring(err)
+            .. "\n"
+        )
     end
 end
 

@@ -29,6 +29,34 @@ function PauseMenuController:ClampSelectedIndex()
     )
 end
 
+function PauseMenuController:GetScreenCenter()
+    return self.Mod.EID:getScreenSize() / 2
+end
+
+function PauseMenuController:GetControllerIndex()
+    local player = Isaac.GetPlayer(CONFIG.PLAYER_INDEX)
+
+    if not player then
+        return 0
+    end
+
+    return player.ControllerIndex
+end
+
+function PauseMenuController:GetItemCount()
+    local player = Isaac.GetPlayer(CONFIG.PLAYER_INDEX)
+
+    if not player then
+        return 0
+    end
+
+    return #player:GetHistory():SearchCollectibles()
+end
+
+function PauseMenuController:GetSelectedSlot()
+    return self.ItemSlots[self.SelectedIndex]
+end
+
 function PauseMenuController:ApplyInspectBackground(pauseBody)
     if not pauseBody or self.InspectBackgroundApplied then
         return
@@ -76,10 +104,6 @@ function PauseMenuController:RestoreInspectBackground()
     self.OriginalPaperSpritesheet = nil
 end
 
-function PauseMenuController:GetScreenCenter()
-    return self.Mod.EID:getScreenSize() / 2
-end
-
 function PauseMenuController:HideLayer(spriteName, layer)
     if not layer then
         return
@@ -115,26 +139,6 @@ function PauseMenuController:RestorePauseLayers()
     end
 
     self.HiddenPauseLayers = {}
-end
-
-function PauseMenuController:GetControllerIndex()
-    local player = Isaac.GetPlayer(CONFIG.PLAYER_INDEX)
-
-    if not player then
-        return 0
-    end
-
-    return player.ControllerIndex
-end
-
-function PauseMenuController:GetItemCount()
-    local player = Isaac.GetPlayer(CONFIG.PLAYER_INDEX)
-
-    if not player then
-        return 0
-    end
-
-    return #player:GetHistory():SearchCollectibles()
 end
 
 function PauseMenuController:GetItemSlots()
@@ -209,10 +213,6 @@ function PauseMenuController:ResetInspectMode()
     self.SelectedIndex = 1
     self.FirstColumnNumber = 1
     self.ItemSlots = {}
-end
-
-function PauseMenuController:GetSelectedSlot()
-    return self.ItemSlots[self.SelectedIndex]
 end
 
 function PauseMenuController:MoveSelection(offset)
@@ -328,17 +328,6 @@ function PauseMenuController:OnPrePauseScreenRender(
                 self:HideLayer("PauseMenu", layer)
             end
         end
-    end
-end
-
-function PauseMenuController:RenderNewMyStaffPage(pauseBody)
-    local myStuffLayer = pauseBody:GetLayer("MyStuff")
-
-    if myStuffLayer then
-        pauseBody:RenderLayer(
-            myStuffLayer:GetLayerID(),
-            self:GetScreenCenter() + CONFIG.MY_STUFF_PAGE_DISPLAY_OFFSET
-        )
     end
 end
 
