@@ -2,7 +2,7 @@
 <metadata>
     <name>My Stuff Descriptions for REPENTOGON</name>
     <directory>my_stuff_descriptions_for_repentogon</directory>
-    <id>0</id>
+    <id>3794496144</id>
     <description>
 [h1] My Stuff Descriptions for REPENTOGON [/h1]
 
@@ -34,4 +34,5 @@ While the pause menu is open:
     <version>0.1.0</version>
     <visibility>Public</visibility>
     <tag id="Lua"/>
+    <tag id="Tweaks"/>
 </metadata>
