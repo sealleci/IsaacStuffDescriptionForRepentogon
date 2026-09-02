@@ -19,12 +19,26 @@ function PauseMenuController:Initialize(mod, renderer)
     self.OriginalPaperSpritesheet = nil
 end
 
+function PauseMenuController:CalcColumnNumber(index)
+    return ((index - 1) // SHARED_CONFIG.ITEM_DISPLAY_COLUMN_COUNT) + 1
+end
+
 function PauseMenuController:ClampSelectedIndex()
     self.SelectedIndex = math.max(
         1,
         math.min(
             self.SelectedIndex,
             #self.ItemSlots
+        )
+    )
+end
+
+function PauseMenuController:ClampFirstColumnNumber()
+    self.FirstColumnNumber = math.max(
+        1,
+        math.min(
+            self.FirstColumnNumber,
+            self:CalcColumnNumber(#self.ItemSlots)
         )
     )
 end
@@ -183,6 +197,7 @@ function PauseMenuController:RefreshItemSlots()
     end
 
     self:ClampSelectedIndex()
+    self:ClampFirstColumnNumber()
 end
 
 function PauseMenuController:EnterInspectMode()
@@ -216,10 +231,6 @@ function PauseMenuController:ResetInspectMode()
 end
 
 function PauseMenuController:MoveSelection(offset)
-    function CalcColumnNumber(value)
-        return ((value - 1) // SHARED_CONFIG.ITEM_DISPLAY_COLUMN_COUNT) + 1
-    end
-
     if #self.ItemSlots == 0 then
         return
     end
@@ -229,17 +240,17 @@ function PauseMenuController:MoveSelection(offset)
     end
 
     if self.SelectedIndex + offset > #self.ItemSlots
-        and CalcColumnNumber(self.SelectedIndex)
-        >= CalcColumnNumber(#self.ItemSlots)
+        and self:CalcColumnNumber(self.SelectedIndex)
+        >= self:CalcColumnNumber(#self.ItemSlots)
     then
         self:ExitInspectMode()
         return
     end
 
-    local prevColumnNumber = CalcColumnNumber(self.SelectedIndex)
+    local prevColumnNumber = self:CalcColumnNumber(self.SelectedIndex)
     self.SelectedIndex = self.SelectedIndex + offset
     self:ClampSelectedIndex()
-    local curColumnNumber = CalcColumnNumber(self.SelectedIndex)
+    local curColumnNumber = self:CalcColumnNumber(self.SelectedIndex)
 
     if prevColumnNumber ~= curColumnNumber then
         local columnNumberDiff = curColumnNumber - self.FirstColumnNumber
@@ -341,9 +352,7 @@ function PauseMenuController:OnPostPauseScreenRender(
 
     self:HandlePauseMenuInput()
 
-    if self:GetItemCount() > 0
-        and #self.ItemSlots <= 0
-    then
+    if #self.ItemSlots ~= self:GetItemCount() then
         self:RefreshItemSlots()
     end
 
