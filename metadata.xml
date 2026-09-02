@@ -2,36 +2,36 @@
 <metadata>
     <name>My Stuff Descriptions for REPENTOGON</name>
     <directory>my_stuff_descriptions_for_repentogon</directory>
-
+    <id>0</id>
     <description>
-# My Stuff Descriptions for REPENTOGON
+[h1] My Stuff Descriptions for REPENTOGON [/h1]
 
-Adds item descriptions and item inspection controls to the **My Stuff** section of the pause menu in *The Binding of Isaac: Repentance+*.
+Adds item descriptions and item inspection controls to the [b] My Stuff [/b] section of the pause menu in [i] The Binding of Isaac: Repentance+ [/i].
 
-The mod is designed for the REPENTOGON-compatible game version and uses **External Item Descriptions (EID)** to provide item information.
+The mod is designed for the REPENTOGON-compatible game version and uses [b] External Item Descriptions (EID) [/b] to provide item information.
 
-## Dependencies
+[h2] Dependencies [/h2]
 
 This mod requires:
+[list]
+    [*] [b] REPENTOGON [/b]
+    [*] [b] External Item Descriptions (EID) [/b]
+[/list]
 
-- **REPENTOGON**
-- **External Item Descriptions (EID)**
+At the moment, REPENTOGON supports patch [b] v1.9.7.12 [/b] and automatically downgrades the game to that version when necessary.
 
-At the moment, REPENTOGON supports patch **v1.9.7.12** and automatically downgrades the game to that version when necessary.
+Official Item Descriptions were introduced in [b] v1.9.7.13 [/b], which is newer than the version currently supported by REPENTOGON. As a result, this mod is primarily intended for the REPENTOGON-compatible v1.9.7.12 environment, where the official item-description feature is not available.
 
-Official Item Descriptions were introduced in **v1.9.7.13**, which is newer than the version currently supported by REPENTOGON. As a result, this mod is primarily intended for the REPENTOGON-compatible v1.9.7.12 environment, where the official item-description feature is not available.
-
-## Controls
+[h2] Controls [/h2]
 
 While the pause menu is open:
-
-- Press **Left** to enter **Inspect Mode**.
-- Use the **Up, Down, Left, and Right** directional controls to move the cursor between collected items.
-- When the cursor reaches the rightmost item, pressing **Right** again exits Inspect Mode and returns control to the pause menu.
+[list]
+    [*] Press [b] Left [/b] to enter [b] Inspect Mode [/b].
+    [*] Use the [b] Up, Down, Left, and Right [/b] directional controls to move the cursor between collected items.
+    [*] When the cursor reaches the rightmost item, pressing [b] Right [/b] again exits Inspect Mode and returns control to the pause menu.
+[/list]
     </description>
-
     <version>0.1.0</version>
-    <visibility>Private</visibility>
-
+    <visibility>Public</visibility>
     <tag id="Lua"/>
 </metadata>
