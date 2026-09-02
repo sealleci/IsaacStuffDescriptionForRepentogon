@@ -1,13 +1,9 @@
 local PauseMenuController = {}
-
 local game = Game()
+local SHARED_CONFIG = include("scripts/shared_config")
 local CONFIG = {
     PLAYER_INDEX = 0,
-    FIRST_ITEM_DISPLAY_OFFSET = Vector(-159, 11),
-    ITEM_DISPLAY_ROW_COUNT = 6,
-    ITEM_DISPLAY_COLUMN_COUNT = 4,
-    ITEM_DISPLAY_STEP_X = 16,
-    ITEM_DISPLAY_STEP_Y = 16
+    FIRST_ITEM_DISPLAY_OFFSET = Vector(-159, 11)
 }
 
 function PauseMenuController:Initialize(mod, renderer)
@@ -15,11 +11,22 @@ function PauseMenuController:Initialize(mod, renderer)
     self.Renderer = renderer
     self.InspectMode = false
     self.SelectedIndex = 1
+    self.FirstColumnNumber = 1
     self.ItemSlots = {}
     self.HiddenPauseLayers = {}
     self.SavedPauseSelection = 0
     self.InspectBackgroundApplied = false
     self.OriginalPaperSpritesheet = nil
+end
+
+function PauseMenuController:ClampSelectedIndex()
+    self.SelectedIndex = math.max(
+        1,
+        math.min(
+            self.SelectedIndex,
+            #self.ItemSlots
+        )
+    )
 end
 
 function PauseMenuController:ApplyInspectBackground(pauseBody)
@@ -49,7 +56,7 @@ function PauseMenuController:RestoreInspectBackground()
         return
     end
 
-    local pauseBody = PauseMenu.GetSprite()
+    local pauseBody = PauseMenu:GetSprite()
 
     if pauseBody and self.OriginalPaperSpritesheet then
         for _, layer in ipairs(pauseBody:GetAllLayers()) do
@@ -86,20 +93,18 @@ function PauseMenuController:HideLayer(spriteName, layer)
 end
 
 function PauseMenuController:RestorePauseLayers()
-    local pauseMenuSprite = PauseMenu.GetSprite()
-    local pauseStatsSprite = PauseMenu.GetStatsSprite()
+    local pauseMenuSprite = PauseMenu:GetSprite()
+    local pauseStatsSprite = PauseMenu:GetStatsSprite()
 
     for _, layerInfo in ipairs(self.HiddenPauseLayers) do
         if pauseStatsSprite then
-            if layerInfo.SpriteName == "pauseMenu" then
+            if layerInfo.SpriteName == "PauseMenu" then
                 local layer = pauseMenuSprite:GetLayer(layerInfo.LayerID)
 
                 if layer then
                     layer:SetVisible(true)
                 end
-            end
-
-            if layerInfo.SpriteName == "pauseStats" then
+            elseif layerInfo.SpriteName == "PauseStats" then
                 local layer = pauseStatsSprite:GetLayer(layerInfo.LayerID)
 
                 if layer then
@@ -122,6 +127,16 @@ function PauseMenuController:GetControllerIndex()
     return player.ControllerIndex
 end
 
+function PauseMenuController:GetItemCount()
+    local player = Isaac.GetPlayer(CONFIG.PLAYER_INDEX)
+
+    if not player then
+        return 0
+    end
+
+    return #player:GetHistory():SearchCollectibles()
+end
+
 function PauseMenuController:GetItemSlots()
     local player = Isaac.GetPlayer(CONFIG.PLAYER_INDEX)
 
@@ -132,21 +147,24 @@ function PauseMenuController:GetItemSlots()
     local slots = {}
     local history = player:GetHistory():SearchCollectibles()
     local screenCenter = self:GetScreenCenter()
+    local serialNumber = 1
 
     for i = #history, 1, -1 do
         local itemID = history[i]:GetItemID()
         local position = screenCenter + CONFIG.FIRST_ITEM_DISPLAY_OFFSET + Vector(
-            (#slots // CONFIG.ITEM_DISPLAY_COLUMN_COUNT) * CONFIG.ITEM_DISPLAY_STEP_X,
-            (#slots % CONFIG.ITEM_DISPLAY_COLUMN_COUNT) * CONFIG.ITEM_DISPLAY_STEP_Y
+            (#slots // SHARED_CONFIG.ITEM_DISPLAY_COLUMN_COUNT) * SHARED_CONFIG.ITEM_DISPLAY_STEP_X,
+            (#slots % SHARED_CONFIG.ITEM_DISPLAY_COLUMN_COUNT) * SHARED_CONFIG.ITEM_DISPLAY_STEP_Y
         )
 
         table.insert(
             slots,
             {
                 ID = itemID,
+                SerialNumber = serialNumber,
                 Position = position
             }
         )
+        serialNumber = serialNumber + 1
     end
 
     return slots
@@ -160,13 +178,7 @@ function PauseMenuController:RefreshItemSlots()
         return
     end
 
-    self.SelectedIndex = math.max(
-        1,
-        math.min(
-            self.SelectedIndex,
-            #self.ItemSlots
-        )
-    )
+    self:ClampSelectedIndex()
 end
 
 function PauseMenuController:EnterInspectMode()
@@ -176,7 +188,7 @@ function PauseMenuController:EnterInspectMode()
         return
     end
 
-    self.SelectedIndex = 1
+    self:ClampSelectedIndex()
     self.InspectMode = true
     self.SavedPauseSelection = PauseMenu.GetSelectedElement()
 end
@@ -195,6 +207,7 @@ end
 function PauseMenuController:ResetInspectMode()
     self.InspectMode = false
     self.SelectedIndex = 1
+    self.FirstColumnNumber = 1
     self.ItemSlots = {}
 end
 
@@ -203,24 +216,46 @@ function PauseMenuController:GetSelectedSlot()
 end
 
 function PauseMenuController:MoveSelection(offset)
+    function CalcColumnNumber(value)
+        return ((value - 1) // SHARED_CONFIG.ITEM_DISPLAY_COLUMN_COUNT) + 1
+    end
+
     if #self.ItemSlots == 0 then
         return
     end
 
-    local newIndex = self.SelectedIndex + offset
+    if self.SelectedIndex + offset < 1 then
+        return
+    end
 
-    newIndex = math.max(
-        1,
-        math.min(
-            newIndex,
-            #self.ItemSlots
-        )
-    )
+    if self.SelectedIndex + offset > #self.ItemSlots
+        and CalcColumnNumber(self.SelectedIndex)
+        >= CalcColumnNumber(#self.ItemSlots)
+    then
+        self:ExitInspectMode()
+        return
+    end
 
-    self.SelectedIndex = newIndex
+    local prevColumnNumber = CalcColumnNumber(self.SelectedIndex)
+    self.SelectedIndex = self.SelectedIndex + offset
+    self:ClampSelectedIndex()
+    local curColumnNumber = CalcColumnNumber(self.SelectedIndex)
+
+    if prevColumnNumber ~= curColumnNumber then
+        local columnNumberDiff = curColumnNumber - self.FirstColumnNumber
+
+        if columnNumberDiff >= SHARED_CONFIG.ITEM_DISPLAY_ROW_COUNT then
+            self.FirstColumnNumber = curColumnNumber
+                - (SHARED_CONFIG.ITEM_DISPLAY_ROW_COUNT - 1)
+        elseif columnNumberDiff < 0 then
+            self.FirstColumnNumber = curColumnNumber
+        end
+    end
+
+    self.Renderer:RenderMyStaffPage(self.ItemSlots, self.FirstColumnNumber)
 end
 
-function PauseMenuController:HandlePauseInput()
+function PauseMenuController:HandlePauseMenuInput()
     local controller = self:GetControllerIndex()
 
     if not self.InspectMode then
@@ -236,15 +271,6 @@ function PauseMenuController:HandlePauseInput()
     end
 
     if Input.IsActionTriggered(
-            ButtonAction.ACTION_MENUBACK,
-            controller
-        )
-    then
-        self:ExitInspectMode()
-        return
-    end
-
-    if Input.IsActionTriggered(
             ButtonAction.ACTION_MENUUP,
             controller
         )
@@ -256,6 +282,18 @@ function PauseMenuController:HandlePauseInput()
         )
     then
         self:MoveSelection(1)
+    elseif Input.IsActionTriggered(
+            ButtonAction.ACTION_MENULEFT,
+            controller
+        )
+    then
+        self:MoveSelection(-SHARED_CONFIG.ITEM_DISPLAY_COLUMN_COUNT)
+    elseif Input.IsActionTriggered(
+            ButtonAction.ACTION_MENURIGHT,
+            controller
+        )
+    then
+        self:MoveSelection(SHARED_CONFIG.ITEM_DISPLAY_COLUMN_COUNT)
     end
 end
 
@@ -269,10 +307,9 @@ function PauseMenuController:OnPrePauseScreenRender(
         return
     end
 
-
     if pauseStats then
         for _, layer in ipairs(pauseStats:GetAllLayers()) do
-            self:HideLayer("pauseStats", layer)
+            self:HideLayer("PauseStats", layer)
         end
     end
 
@@ -288,9 +325,20 @@ function PauseMenuController:OnPrePauseScreenRender(
             local layerName = tostring(layer:GetName())
 
             if targetLayers[layerName] then
-                self:HideLayer("pauseMenu", layer)
+                self:HideLayer("PauseMenu", layer)
             end
         end
+    end
+end
+
+function PauseMenuController:RenderNewMyStaffPage(pauseBody)
+    local myStuffLayer = pauseBody:GetLayer("MyStuff")
+
+    if myStuffLayer then
+        pauseBody:RenderLayer(
+            myStuffLayer:GetLayerID(),
+            self:GetScreenCenter() + CONFIG.MY_STUFF_PAGE_DISPLAY_OFFSET
+        )
     end
 end
 
@@ -298,24 +346,33 @@ function PauseMenuController:OnPostPauseScreenRender(
     pauseBody,
     pauseStats
 )
-    if game:GetPauseMenuState() ~= PauseMenuStates.OPEN then
-        self:ResetInspectMode()
+    if pauseBody:GetAnimation() == "Dissapear" then
         return
     end
 
-    self:HandlePauseInput()
+    self:HandlePauseMenuInput()
 
-    if not self.InspectMode then
-        return
+    if self:GetItemCount() > 0
+        and #self.ItemSlots <= 0
+    then
+        self:RefreshItemSlots()
     end
 
-    local selectedSlot = self:GetSelectedSlot()
+    self.Renderer:RenderMyStaffPage(
+        self.ItemSlots,
+        self.FirstColumnNumber,
+        pauseBody
+    )
 
-    if selectedSlot then
-        self.Renderer:Render(selectedSlot)
+    if self.InspectMode then
+        local selectedSlot = self:GetSelectedSlot()
+
+        if selectedSlot then
+            self.Renderer:RenderInspect(selectedSlot, self.FirstColumnNumber)
+        end
+
+        PauseMenu.SetSelectedElement(self.SavedPauseSelection)
     end
-
-    PauseMenu.SetSelectedElement(self.SavedPauseSelection)
 end
 
 function PauseMenuController:OnPostRender()
@@ -401,17 +458,17 @@ function PauseMenuController:OnExecuteCommand(
 
     self:DumpSpriteInfo(
         "My Stuff",
-        PauseMenu.GetMyStuffSprite()
+        PauseMenu:GetMyStuffSprite()
     )
 
     self:DumpSpriteInfo(
         "Pause Menu",
-        PauseMenu.GetSprite()
+        PauseMenu:GetSprite()
     )
 
     self:DumpSpriteInfo(
         "Pause Stats",
-        PauseMenu.GetStatsSprite()
+        PauseMenu:GetStatsSprite()
     )
 end
 

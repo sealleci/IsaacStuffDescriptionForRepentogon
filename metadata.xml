@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <metadata>
-    <name>My Stuff Descriptions for Repentogon</name>
+    <name>My Stuff Descriptions for REPENTOGON</name>
     <directory>my_stuff_descriptions_for_repentogon</directory>
 
     <description>
-        Add item descriptions to the My Stuff section of the pause menu.
-        Require REPENTOGON and External Item Descriptions.
+        Adds item descriptions and inspection controls to the My Stuff section
+        of the pause menu.
+
+        Requires REPENTOGON and External Item Descriptions (EID).
     </description>
 
     <version>0.1.0</version>

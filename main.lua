@@ -11,12 +11,23 @@ MSD4R.Enabled = false
 MSD4R.EID = nil
 
 function MSD4R:OnModsLoaded()
+    if PauseMenu == nil
+        or XMLData == nil
+        or ModCallbacks.MC_PRE_PAUSE_SCREEN_RENDER == nil
+        or ModCallbacks.MC_POST_PAUSE_SCREEN_RENDER == nil
+    then
+        self.Enabled = false
+        Isaac.ConsoleOutput("[MSD4R] REPENTOGON API is unavailable.\n")
+
+        return
+    end
+
     local eidMetadata = XMLData.GetModById(EID_MOD_ID)
 
     if eidMetadata == nil or EID == nil then
+        self.Enabled = false
         Isaac.ConsoleOutput("[MSD4R] EID API is unavailable.\n")
 
-        self.Enabled = false
         return
     end
 
@@ -24,8 +35,10 @@ function MSD4R:OnModsLoaded()
     self.Enabled = true
 
     Renderer:Initialize(self)
-    PauseMenuController:Initialize(self, Renderer)
-
+    PauseMenuController:Initialize(
+        self,
+        Renderer
+    )
     Isaac.ConsoleOutput("[MSD4R] Initialized successfully.\n")
 end
 
@@ -65,7 +78,10 @@ function MSD4R:OnPostRender()
     PauseMenuController:OnPostRender()
 end
 
-function MSD4R:OnExecuteCommand(command, params)
+function MSD4R:OnExecuteCommand(
+    command,
+    params
+)
     if not self.Enabled then
         return
     end
