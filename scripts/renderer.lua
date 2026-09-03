@@ -2,7 +2,8 @@ local Renderer = {}
 local SHARED_CONFIG = include("scripts/shared_config")
 local CONFIG = {
     MY_STUFF_PAGE_DISPLAY_OFFSET = Vector(50, 0),
-    MY_STUFF_ITEM_ICON_DISPLAY_OFFSET = Vector(84, -20),
+    MY_STUFF_ITEM_DISPLAY_OFFSET = Vector(84, -20),
+    FIRST_ITEM_DISPLAY_OFFSET = Vector(-159, 11),
     CURSOR_SIZE = Vector(8, 8),
     DESCRIPTION_OFFSET = Vector(0, -65),
     DESCRIPTION_WIDTH = 140,
@@ -26,8 +27,38 @@ function Renderer:Initialize(mod)
     self.StuffArrowSprite:SetFrame("Idle", 0)
 end
 
-function Renderer:GetScreenCenter()
-    return self.EID:getScreenSize() / 2
+function Renderer:GetPauseMenuExtraOffset()
+    return Vector(
+        math.floor(Isaac.GetScreenWidth() / 10 - 48),
+        0
+    )
+end
+
+function Renderer:GetPauseMenuAnchor()
+    return Vector(
+        math.floor(Isaac.GetScreenWidth() * 0.5),
+        math.floor(Isaac.GetScreenHeight() * 0.5)
+    ) + self:GetPauseMenuExtraOffset()
+end
+
+function Renderer:GetColumnNumber(index)
+    if index <= 0 then
+        return 1
+    end
+
+    return ((index - 1) // SHARED_CONFIG.ITEM_DISPLAY_COLUMN_COUNT) + 1
+end
+
+function Renderer:GetItemSlotPosition(index, firstColumnNumber)
+    local columnNumber = (index - 1) // SHARED_CONFIG.ITEM_DISPLAY_COLUMN_COUNT + 1
+    local rowNumber = (index - 1) % SHARED_CONFIG.ITEM_DISPLAY_COLUMN_COUNT
+
+    return self:GetPauseMenuAnchor()
+        + CONFIG.FIRST_ITEM_DISPLAY_OFFSET
+        + Vector(
+            (columnNumber - firstColumnNumber) * SHARED_CONFIG.ITEM_DISPLAY_STEP_X,
+            rowNumber * SHARED_CONFIG.ITEM_DISPLAY_STEP_Y
+        )
 end
 
 function Renderer:GetDescription(itemID)
@@ -57,10 +88,7 @@ function Renderer:GetDescription(itemID)
     return result
 end
 
-function Renderer:RenderItemIcon(
-    itemID,
-    position
-)
+function Renderer:RenderItemIcon(itemID, position)
     self.DeathScreenSprite:SetFrame(
         "Diary",
         itemID - 1
@@ -74,21 +102,20 @@ function Renderer:RenderItemIcon(
 
     self.DeathScreenSprite:RenderLayer(
         layer:GetLayerID(),
-        position + CONFIG.MY_STUFF_ITEM_ICON_DISPLAY_OFFSET
+        position + CONFIG.MY_STUFF_ITEM_DISPLAY_OFFSET
     )
 end
 
-function Renderer:RenderStuffArrows(
-    itemSlots,
-    firstColumnNumber
-)
+function Renderer:RenderStuffArrows(itemSlots, firstColumnNumber)
     local leftArrowLayer = self.StuffArrowSprite:GetLayer("StuffArrow1")
     local rightArrowLayer = self.StuffArrowSprite:GetLayer("StuffArrow2")
-    local lastColumnNumber = CalcColumnNumber(#itemSlots)
+    local lastColumnNumber = self:GetColumnNumber(#itemSlots)
     local hasLeftPage = firstColumnNumber > 1
-    local hasRightPage = firstColumnNumber + (SHARED_CONFIG.ITEM_DISPLAY_ROW_COUNT - 1)
+    local hasRightPage = firstColumnNumber
+        + (SHARED_CONFIG.ITEM_DISPLAY_ROW_COUNT - 1)
         < lastColumnNumber
-    local renderPosition = self:GetScreenCenter() + CONFIG.MY_STUFF_PAGE_DISPLAY_OFFSET
+    local renderPosition = self:GetPauseMenuAnchor()
+        + CONFIG.MY_STUFF_PAGE_DISPLAY_OFFSET
 
     if hasLeftPage and leftArrowLayer then
         self.StuffArrowSprite:RenderLayer(
@@ -105,17 +132,17 @@ function Renderer:RenderStuffArrows(
     end
 end
 
-function Renderer:RenderMyStaffPage(
+function Renderer:RenderMyStuffPage(
     itemSlots,
     firstColumnNumber,
     pauseBody
 )
-    function CalcColumnNumber(value)
-        return ((value - 1) // SHARED_CONFIG.ITEM_DISPLAY_COLUMN_COUNT) + 1
-    end
-
     if not pauseBody then
-        pauseBody = PauseMenu:GetSprite()
+        pauseBody = PauseMenu.GetSprite()
+
+        if not pauseBody then
+            return
+        end
     end
 
     local myStuffLayer = pauseBody:GetLayer("MyStuff")
@@ -123,39 +150,35 @@ function Renderer:RenderMyStaffPage(
     if myStuffLayer then
         pauseBody:RenderLayer(
             myStuffLayer:GetLayerID(),
-            self:GetScreenCenter() + CONFIG.MY_STUFF_PAGE_DISPLAY_OFFSET
+            self:GetPauseMenuAnchor() + CONFIG.MY_STUFF_PAGE_DISPLAY_OFFSET
         )
-        self:RenderStuffArrows(itemSlots, firstColumnNumber)
     end
 
-    local renderedItemCount = 0
-    local MAX_ITEM_COUNT = SHARED_CONFIG.ITEM_DISPLAY_ROW_COUNT * SHARED_CONFIG.ITEM_DISPLAY_COLUMN_COUNT
+    local firstVisibleIndex = (firstColumnNumber - 1)
+        * SHARED_CONFIG.ITEM_DISPLAY_COLUMN_COUNT + 1
+    local maxItemCount = SHARED_CONFIG.ITEM_DISPLAY_ROW_COUNT
+        * SHARED_CONFIG.ITEM_DISPLAY_COLUMN_COUNT
+    local lastVisibleIndex = math.min(
+        #itemSlots,
+        firstVisibleIndex + maxItemCount - 1
+    )
 
-    for i, slot in ipairs(itemSlots) do
-        if i >= (firstColumnNumber - 1) * SHARED_CONFIG.ITEM_DISPLAY_COLUMN_COUNT + 1
-            and renderedItemCount < MAX_ITEM_COUNT
-        then
+    for i = firstVisibleIndex, lastVisibleIndex do
+        local slot = itemSlots[i]
+
+        if slot then
             self:RenderItemIcon(
                 slot.ID,
-                slot.Position - Vector(
-                    (firstColumnNumber - 1) * SHARED_CONFIG.ITEM_DISPLAY_STEP_X,
-                    0
-                )
+                self:GetItemSlotPosition(slot.Index, firstColumnNumber)
             )
-            renderedItemCount = renderedItemCount + 1
-        end
-
-        if renderedItemCount >= MAX_ITEM_COUNT then
-            break
         end
     end
+
+    self:RenderStuffArrows(itemSlots, firstColumnNumber)
 end
 
-function Renderer:RenderCursor(slot, firstColumnNumber)
-    local position = slot.Position - Vector(
-        (firstColumnNumber - 1) * SHARED_CONFIG.ITEM_DISPLAY_STEP_X,
-        0
-    )
+function Renderer:RenderCursor(index, firstColumnNumber)
+    local position = self:GetItemSlotPosition(index, firstColumnNumber)
 
     Isaac.DrawQuad(
         position - CONFIG.CURSOR_SIZE,
@@ -174,7 +197,7 @@ function Renderer:RenderDescription(slot)
         return
     end
 
-    local renderPosition = self:GetScreenCenter() + CONFIG.DESCRIPTION_OFFSET
+    local renderPosition = self:GetPauseMenuAnchor() + CONFIG.DESCRIPTION_OFFSET
     local prevScale = self.EID.Scale
     local prevTextboxWidth = self.EID.Config["TextboxWidth"]
     local prevInsideItemReminder = self.EID.InsideItemReminder
@@ -198,7 +221,8 @@ function Renderer:RenderDescription(slot)
                 textScale,
                 nameColor
             )
-            renderPosition.Y = renderPosition.Y + self.EID.lineHeight * self.EID.Scale
+            renderPosition.Y = renderPosition.Y
+                + self.EID.lineHeight * self.EID.Scale
         end
 
         if description.Description and description.Description ~= "" then
@@ -223,8 +247,8 @@ function Renderer:RenderDescription(slot)
     end
 end
 
-function Renderer:RenderInspect(slot, firstColumnNumber)
-    self:RenderCursor(slot, firstColumnNumber)
+function Renderer:RenderInspect(slot, selectedIndex, firstColumnNumber)
+    self:RenderCursor(selectedIndex, firstColumnNumber)
     self:RenderDescription(slot)
 end
 
