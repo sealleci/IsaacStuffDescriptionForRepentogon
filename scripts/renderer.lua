@@ -5,6 +5,7 @@ local CONFIG = {
     MY_STUFF_ITEM_DISPLAY_OFFSET = Vector(84, -19),
     FIRST_ITEM_DISPLAY_OFFSET = Vector(-159, 11),
     CURSOR_SIZE = Vector(8, 8),
+    CURSOR_DISPLAY_OFFSET = Vector(0, 1),
     DESCRIPTION_OFFSET = Vector(0, -65),
     DESCRIPTION_WIDTH = 140,
     DESCRIPTION_SCALE = 1.0
@@ -178,7 +179,7 @@ function Renderer:RenderMyStuffPage(itemSlots, firstColumnNumber)
 end
 
 function Renderer:RenderCursor(index, firstColumnNumber)
-    local position = self:GetItemSlotPosition(index, firstColumnNumber)
+    local position = self:GetItemSlotPosition(index, firstColumnNumber) + CONFIG.CURSOR_DISPLAY_OFFSET
 
     Isaac.DrawQuad(
         position - CONFIG.CURSOR_SIZE,
