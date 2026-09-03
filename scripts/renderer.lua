@@ -1,8 +1,8 @@
 local Renderer = {}
 local SHARED_CONFIG = include("scripts/shared_config")
 local CONFIG = {
-    MY_STUFF_PAGE_DISPLAY_OFFSET = Vector(50, 0),
-    MY_STUFF_ITEM_DISPLAY_OFFSET = Vector(84, -20),
+    MY_STUFF_PAGE_DISPLAY_OFFSET = Vector(49, 0),
+    MY_STUFF_ITEM_DISPLAY_OFFSET = Vector(84, -19),
     FIRST_ITEM_DISPLAY_OFFSET = Vector(-159, 11),
     CURSOR_SIZE = Vector(8, 8),
     DESCRIPTION_OFFSET = Vector(0, -65),
@@ -13,18 +13,18 @@ local CONFIG = {
 function Renderer:Initialize(mod)
     self.Mod = mod
     self.EID = mod.EID
+    self.PauseMenuSprite = Sprite()
+    self.PauseMenuSprite:Load(
+        "gfx/ui/pausescreen.anm2",
+        true
+    )
+    self.PauseMenuSprite:SetFrame("Idle", 0)
     self.DeathScreenSprite = Sprite()
     self.DeathScreenSprite:Load(
         "gfx/ui/death screen.anm2",
         true
     )
     self.DeathScreenSprite:Play("Diary", true)
-    self.StuffArrowSprite = Sprite()
-    self.StuffArrowSprite:Load(
-        "gfx/ui/pausescreen.anm2",
-        true
-    )
-    self.StuffArrowSprite:SetFrame("Idle", 0)
 end
 
 function Renderer:GetPauseMenuExtraOffset()
@@ -88,6 +88,14 @@ function Renderer:GetDescription(itemID)
     return result
 end
 
+function Renderer:SetMyStuffPageFrame(animation, frame)
+    self.PauseMenuSprite:SetFrame(animation, frame)
+end
+
+function Renderer:SetMyStuffPageIdle()
+    self.PauseMenuSprite:SetFrame("Idle", 0)
+end
+
 function Renderer:RenderItemIcon(itemID, position)
     self.DeathScreenSprite:SetFrame(
         "Diary",
@@ -106,9 +114,20 @@ function Renderer:RenderItemIcon(itemID, position)
     )
 end
 
+function Renderer:RenderEmptyMyStuffPage()
+    local myStuffLayer = self.PauseMenuSprite:GetLayer("MyStuff")
+
+    if myStuffLayer then
+        self.PauseMenuSprite:RenderLayer(
+            myStuffLayer:GetLayerID(),
+            self:GetPauseMenuAnchor() + CONFIG.MY_STUFF_PAGE_DISPLAY_OFFSET
+        )
+    end
+end
+
 function Renderer:RenderStuffArrows(itemSlots, firstColumnNumber)
-    local leftArrowLayer = self.StuffArrowSprite:GetLayer("StuffArrow1")
-    local rightArrowLayer = self.StuffArrowSprite:GetLayer("StuffArrow2")
+    local leftArrowLayer = self.PauseMenuSprite:GetLayer("StuffArrow1")
+    local rightArrowLayer = self.PauseMenuSprite:GetLayer("StuffArrow2")
     local lastColumnNumber = self:GetColumnNumber(#itemSlots)
     local hasLeftPage = firstColumnNumber > 1
     local hasRightPage = firstColumnNumber
@@ -118,41 +137,22 @@ function Renderer:RenderStuffArrows(itemSlots, firstColumnNumber)
         + CONFIG.MY_STUFF_PAGE_DISPLAY_OFFSET
 
     if hasLeftPage and leftArrowLayer then
-        self.StuffArrowSprite:RenderLayer(
+        self.PauseMenuSprite:RenderLayer(
             leftArrowLayer:GetLayerID(),
             renderPosition
         )
     end
 
     if hasRightPage and rightArrowLayer then
-        self.StuffArrowSprite:RenderLayer(
+        self.PauseMenuSprite:RenderLayer(
             rightArrowLayer:GetLayerID(),
             renderPosition
         )
     end
 end
 
-function Renderer:RenderMyStuffPage(
-    itemSlots,
-    firstColumnNumber,
-    pauseBody
-)
-    if not pauseBody then
-        pauseBody = PauseMenu.GetSprite()
-
-        if not pauseBody then
-            return
-        end
-    end
-
-    local myStuffLayer = pauseBody:GetLayer("MyStuff")
-
-    if myStuffLayer then
-        pauseBody:RenderLayer(
-            myStuffLayer:GetLayerID(),
-            self:GetPauseMenuAnchor() + CONFIG.MY_STUFF_PAGE_DISPLAY_OFFSET
-        )
-    end
+function Renderer:RenderMyStuffPage(itemSlots, firstColumnNumber)
+    self:RenderEmptyMyStuffPage()
 
     local firstVisibleIndex = (firstColumnNumber - 1)
         * SHARED_CONFIG.ITEM_DISPLAY_COLUMN_COUNT + 1

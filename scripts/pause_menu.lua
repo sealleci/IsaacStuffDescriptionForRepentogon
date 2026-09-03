@@ -310,6 +310,29 @@ function PauseMenuController:OnPrePauseScreenRender(
         return
     end
 
+    local animation = pauseBody:GetAnimation()
+
+    if animation == "Appear"
+        or animation == "Dissapear"
+    then
+        self.Renderer:SetMyStuffPageFrame(
+            animation,
+            pauseBody:GetFrame()
+        )
+    else
+        self.Renderer:SetMyStuffPageIdle()
+    end
+
+    if pauseBody then
+        for _, layer in ipairs(pauseBody:GetAllLayers()) do
+            local layerName = tostring(layer:GetName())
+
+            if layerName == "MyStuff" then
+                layer:SetVisible(false)
+            end
+        end
+    end
+
     if not self.InspectMode then
         return
     end
@@ -345,9 +368,16 @@ function PauseMenuController:OnPostPauseScreenRender(
     if not game:IsPauseMenuOpen()
         or PauseMenu.GetState() == PauseMenuStates.OPTIONS
         or not pauseBody
-        or pauseBody:GetAnimation() == "Appear"
-        or pauseBody:GetAnimation() == "Dissapear"
     then
+        return
+    end
+
+    local animation = pauseBody:GetAnimation()
+
+    if animation == "Appear"
+        or animation == "Dissapear"
+    then
+        self.Renderer:RenderEmptyMyStuffPage()
         return
     end
 
@@ -359,8 +389,7 @@ function PauseMenuController:OnPostPauseScreenRender(
     self:HandlePauseMenuInput()
     self.Renderer:RenderMyStuffPage(
         self.ItemSlots,
-        self.FirstColumnNumber,
-        pauseBody
+        self.FirstColumnNumber
     )
 
     if self.InspectMode then
