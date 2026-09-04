@@ -1,5 +1,7 @@
 # Isaac Stuff Descriptions for REPENTOGON
 
+![Thumbnail](./cover.png)
+
 Adds item descriptions and item inspection controls to the **My Stuff** section of the pause menu in *The Binding of Isaac: Repentance+*.
 
 The mod is designed for the REPENTOGON-compatible game version and uses **External Item Descriptions (EID)** to provide item information.
