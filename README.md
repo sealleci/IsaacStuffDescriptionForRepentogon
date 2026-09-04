@@ -1,6 +1,7 @@
 # Isaac Stuff Descriptions for REPENTOGON
 
-![Thumbnail](./cover.png)
+<!-- markdownlint-disable-next-line MD033 -->
+<img src="./cover.png" alt="thumbnail" width="300"/>
 
 Adds item descriptions and item inspection controls to the **My Stuff** section of the pause menu in *The Binding of Isaac: Repentance+*.
 
