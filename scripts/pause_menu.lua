@@ -1,38 +1,26 @@
 local PauseMenuController = {}
 local game = Game()
 local SHARED_CONFIG = include("scripts/shared_config")
-local CONFIG = {
-    PLAYER_INDEX = 0
-}
 
 function PauseMenuController:Initialize(mod, renderer)
     self.Mod = mod
     self.Renderer = renderer
-    self.ItemSlots = {}
+    self.PlayerIndex = 0
+    self.PlayerInputIndex = 0
+    self.AllPlayersItemSlots = {}
     self.InspectMode = false
     self.PauseSessionActive = false
-    self.SelectedIndex = 1
+    self.SelectedItemSlotIndex = 1
     self.FirstColumnNumber = 1
-    self.HiddenPauseMenuLayers = {}
     self.SavedPauseMenuSelection = 0
-    self.PauseMenuSpritesheetReplaced = false
-    self.OriginalPauseMenuSpritesheet = nil
-end
-
-function PauseMenuController:GetColumnNumber(index)
-    if index <= 0 then
-        return 1
-    end
-
-    return ((index - 1) // SHARED_CONFIG.ITEM_DISPLAY_COLUMN_COUNT) + 1
 end
 
 function PauseMenuController:ClampSelectedIndex()
-    self.SelectedIndex = math.max(
+    self.SelectedItemSlotIndex = math.max(
         1,
         math.min(
-            self.SelectedIndex,
-            #self.ItemSlots
+            self.SelectedItemSlotIndex,
+            #(self.AllPlayersItemSlots[self.PlayerIndex] or {})
         )
     )
 end
@@ -42,13 +30,23 @@ function PauseMenuController:ClampFirstColumnNumber()
         1,
         math.min(
             self.FirstColumnNumber,
-            self:GetColumnNumber(#self.ItemSlots)
+            SHARED_CONFIG:GetColumnNumber(#(self.AllPlayersItemSlots[self.PlayerIndex] or {}))
         )
     )
 end
 
+function PauseMenuController:GetPlayerType()
+    local player = Isaac.GetPlayer(self.PlayerIndex)
+
+    if not player then
+        return 0
+    end
+
+    return player:GetPlayerType()
+end
+
 function PauseMenuController:GetControllerIndex()
-    local player = Isaac.GetPlayer(CONFIG.PLAYER_INDEX)
+    local player = Isaac.GetPlayer(self.PlayerInputIndex)
 
     if not player then
         return 0
@@ -57,116 +55,30 @@ function PauseMenuController:GetControllerIndex()
     return player.ControllerIndex
 end
 
-function PauseMenuController:GetSelectedSlot()
-    return self.ItemSlots[self.SelectedIndex]
-end
+function PauseMenuController:GetSelectedItemSlot()
+    local itemSlots = self.AllPlayersItemSlots[self.PlayerIndex]
 
-function PauseMenuController:ReplacePauseMenuSpritesheet(pauseBody)
-    if self.PauseMenuSpritesheetReplaced then
-        return
-    end
-
-    if not pauseBody then
-        pauseBody = PauseMenu.GetSprite()
-
-        if not pauseBody then
-            return
-        end
-    end
-
-    for _, layer in ipairs(pauseBody:GetAllLayers()) do
-        if tostring(layer:GetName()) == "Paper" then
-            local layerID = layer:GetLayerID()
-            self.OriginalPauseMenuSpritesheet = layer:GetSpritesheetPath()
-            pauseBody:ReplaceSpritesheet(
-                layerID,
-                "gfx/ui/pausescreen_msd4r.png"
-            )
-            pauseBody:LoadGraphics()
-            self.PauseMenuSpritesheetReplaced = true
-
-            return
-        end
+    if itemSlots then
+        return itemSlots[self.SelectedItemSlotIndex]
+    else
+        return nil
     end
 end
 
-function PauseMenuController:RestorePauseMenuSpritesheet()
-    if not self.PauseMenuSpritesheetReplaced then
-        return
-    end
-
-    local pauseBody = PauseMenu.GetSprite()
-
-    if pauseBody and self.OriginalPauseMenuSpritesheet then
-        for _, layer in ipairs(pauseBody:GetAllLayers()) do
-            if tostring(layer:GetName()) == "Paper" then
-                pauseBody:ReplaceSpritesheet(
-                    layer:GetLayerID(),
-                    self.OriginalPauseMenuSpritesheet
-                )
-                pauseBody:LoadGraphics()
-                break
-            end
-        end
-    end
-
-    self.PauseMenuSpritesheetReplaced = false
-    self.OriginalPauseMenuSpritesheet = nil
-end
-
-function PauseMenuController:HideLayer(spriteName, layer)
-    if not layer
-        or not layer:IsVisible()
-    then
-        return
-    end
-
-    layer:SetVisible(false)
-    table.insert(self.HiddenPauseMenuLayers, {
-        SpriteName = spriteName,
-        LayerID = layer:GetLayerID()
-    })
-end
-
-function PauseMenuController:RestorePauseMenuLayers()
-    local pauseMenuSprite = PauseMenu.GetSprite()
-    local pauseStatsSprite = PauseMenu.GetStatsSprite()
-
-    for _, layerInfo in ipairs(self.HiddenPauseMenuLayers) do
-        local sprite = nil
-
-        if layerInfo.SpriteName == "PauseMenu" then
-            sprite = pauseMenuSprite
-        elseif layerInfo.SpriteName == "PauseStats" then
-            sprite = pauseStatsSprite
-        end
-
-        if sprite then
-            local layer = sprite:GetLayer(layerInfo.LayerID)
-
-            if layer then
-                layer:SetVisible(true)
-            end
-        end
-    end
-
-    self.HiddenPauseMenuLayers = {}
-end
-
-function PauseMenuController:GetItemSlots()
-    local player = Isaac.GetPlayer(CONFIG.PLAYER_INDEX)
+function PauseMenuController:GetSinglePlayerItemSlots(playerIndex)
+    local itemSlots = {}
+    local player = Isaac.GetPlayer(playerIndex)
 
     if not player then
         return {}
     end
 
-    local slots = {}
     local history = player:GetHistory():SearchCollectibles()
     local itemIndex = 1
 
     for i = #history, 1, -1 do
         table.insert(
-            slots,
+            itemSlots,
             {
                 ID = history[i]:GetItemID(),
                 Index = itemIndex
@@ -175,14 +87,40 @@ function PauseMenuController:GetItemSlots()
         itemIndex = itemIndex + 1
     end
 
-    return slots
+    return itemSlots
+end
+
+function PauseMenuController:GetAllPlayersItemSlots()
+    local allPlayersItemSlots = {}
+
+    for playerIndex = 0, game:GetNumPlayers() - 1 do
+        allPlayersItemSlots[playerIndex] = self:GetSinglePlayerItemSlots(playerIndex)
+    end
+
+    return allPlayersItemSlots
+end
+
+function PauseMenuController:GetCurPlayerItemSlots()
+    return self.AllPlayersItemSlots[self.PlayerIndex] or {}
+end
+
+function PauseMenuController:GetPlayerCountWithItems()
+    local count = 0
+
+    for _, itemSlots in pairs(self.AllPlayersItemSlots) do
+        if #(itemSlots or {}) > 0 then
+            count = count + 1
+        end
+    end
+
+    return count
 end
 
 function PauseMenuController:RefreshItemSlots()
-    self.ItemSlots = self:GetItemSlots()
+    self.AllPlayersItemSlots = self:GetAllPlayersItemSlots()
 
-    if #self.ItemSlots == 0 then
-        self.SelectedIndex = 1
+    if #(self.AllPlayersItemSlots[self.PlayerIndex] or {}) == 0 then
+        self.SelectedItemSlotIndex = 1
         self.FirstColumnNumber = 1
         return
     end
@@ -191,22 +129,44 @@ function PauseMenuController:RefreshItemSlots()
     self:ClampFirstColumnNumber()
 end
 
+function PauseMenuController:PickPlayerWithItems()
+    if #(self.AllPlayersItemSlots[self.PlayerIndex] or {}) < 1 then
+        local availablePlayerIndices = {}
+        for playerIndex, _ in pairs(self.AllPlayersItemSlots) do
+            table.insert(availablePlayerIndices, playerIndex)
+        end
+        table.sort(availablePlayerIndices)
+
+        for _, playerIndex in ipairs(availablePlayerIndices) do
+            if playerIndex ~= self.PlayerIndex
+                and self.AllPlayersItemSlots[playerIndex]
+                and #self.AllPlayersItemSlots[playerIndex] > 0
+            then
+                self.PlayerIndex = playerIndex
+                self.SelectedItemSlotIndex = 1
+                self.FirstColumnNumber = 1
+                break
+            end
+        end
+    end
+end
+
 function PauseMenuController:EnterInspectMode()
     self:RefreshItemSlots()
+    self:PickPlayerWithItems()
 
-    if #self.ItemSlots == 0 then
+    if #(self.AllPlayersItemSlots[self.PlayerIndex] or {}) < 1 then
         return
     end
 
-    self:ClampSelectedIndex()
-    self.InspectMode = true
     self.SavedPauseMenuSelection = PauseMenu.GetSelectedElement()
+    self.InspectMode = true
 end
 
 function PauseMenuController:ExitInspectMode()
     self.InspectMode = false
-    self:RestorePauseMenuSpritesheet()
-    self:RestorePauseMenuLayers()
+    self.Renderer:RestorePauseMenuSpritesheet()
+    self.Renderer:RestorePauseMenuLayers()
 
     if game:IsPauseMenuOpen()
         and PauseMenu.GetState() ~= PauseMenuStates.OPTIONS
@@ -215,36 +175,132 @@ function PauseMenuController:ExitInspectMode()
     end
 end
 
-function PauseMenuController:ResetInspectMode()
-    self.InspectMode = false
-    self.SelectedIndex = 1
-    self.FirstColumnNumber = 1
-    self.ItemSlots = {}
+function PauseMenuController:SwitchPlayerItemsDisplay(offset)
+    local direction = offset > 0 and 1 or -1
+    local availableIndices = {}
+    for _playerIndex in pairs(self.AllPlayersItemSlots) do
+        table.insert(availableIndices, _playerIndex)
+    end
+    table.sort(availableIndices)
+
+    local availableCount = #availableIndices
+    if availableCount < 1 then
+        self.SelectedItemSlotIndex = 1
+        self.FirstColumnNumber = 1
+        return
+    end
+
+    local curAvailablePosition = 1
+    for i = 1, #availableIndices do
+        if availableIndices[i] == self.PlayerIndex then
+            curAvailablePosition = i
+            break
+        end
+    end
+
+    --[[
+    Normalize the next index after applying the offset
+    so that it stays within range
+    ]]
+    local nextAvailablePosition = curAvailablePosition + offset
+    if nextAvailablePosition < 1 then
+        nextAvailablePosition = nextAvailablePosition
+            + math.ceil(
+                math.abs(nextAvailablePosition - 1)
+                / availableCount
+            )
+            * availableCount
+    end
+    nextAvailablePosition = (
+        (nextAvailablePosition - 1)
+        % availableCount
+    ) + 1
+
+    --[[
+    Treat the list as circular:
+    traverse it once starting from the initial index
+    without returning to the initial index
+    ]]
+    for _ = 1, availableCount do
+        local playerIndex = availableIndices[nextAvailablePosition]
+        local itemSlots = self.AllPlayersItemSlots[playerIndex]
+
+        if playerIndex ~= self.PlayerIndex
+            and itemSlots
+            and #itemSlots > 0
+        then
+            self.PlayerIndex = playerIndex
+            self.SelectedItemSlotIndex = 1
+            self.FirstColumnNumber = 1
+            self:RefreshItemSlots()
+
+            return
+        end
+
+        nextAvailablePosition = (
+            (nextAvailablePosition - 1 + direction)
+            % availableCount
+        ) + 1
+    end
 end
 
-function PauseMenuController:MoveSelection(offset)
-    if #self.ItemSlots == 0 then
+function PauseMenuController:MoveCursor(offset, horizontal)
+    local itemSlotsLength = #(self.AllPlayersItemSlots[self.PlayerIndex] or {})
+    if itemSlotsLength < 1 then
+        self:ExitInspectMode()
         return
     end
 
-    if self.SelectedIndex + offset < 1 then
-        return
+    if horizontal then
+        offset = offset * SHARED_CONFIG.ITEM_DISPLAY_COLUMN_COUNT
     end
 
-    if self.SelectedIndex + offset > #self.ItemSlots
-        and self:GetColumnNumber(self.SelectedIndex)
-        >= self:GetColumnNumber(#self.ItemSlots)
+    local nextIndex = self.SelectedItemSlotIndex + offset
+    local prevColumnNumber = SHARED_CONFIG:GetColumnNumber(self.SelectedItemSlotIndex)
+    local curColumnNumber = SHARED_CONFIG:GetColumnNumber(nextIndex)
+    local maxColumnNumber = SHARED_CONFIG:GetColumnNumber(itemSlotsLength)
+
+    -- Exit inspect mode when the cursor reaches the right edge
+    if horizontal
+        and nextIndex > itemSlotsLength
+        and prevColumnNumber >= maxColumnNumber
     then
         self:ExitInspectMode()
         return
     end
 
-    local prevColumnNumber = self:GetColumnNumber(self.SelectedIndex)
-    self.SelectedIndex = self.SelectedIndex + offset
-    self:ClampSelectedIndex()
-    local curColumnNumber = self:GetColumnNumber(self.SelectedIndex)
+    --[[
+    Switch to another character's item list
+    when the cursor reaches the top or bottom edge
+    ]]
+    if not horizontal
+        and (
+            nextIndex > itemSlotsLength
+            or nextIndex < 1
+            or prevColumnNumber ~= curColumnNumber
+        )
+    then
+        local switchOffset = 1
+        if offset < 0 then
+            switchOffset = -1
+            self.SelectedItemSlotIndex = (prevColumnNumber - 1) * SHARED_CONFIG.ITEM_DISPLAY_COLUMN_COUNT + 1
+        else
+            self.SelectedItemSlotIndex = prevColumnNumber * SHARED_CONFIG.ITEM_DISPLAY_COLUMN_COUNT
+        end
 
-    if prevColumnNumber ~= curColumnNumber then
+        self:SwitchPlayerItemsDisplay(switchOffset)
+        return
+    end
+
+    -- Do nothing when the cursor reaches the left edge
+    if nextIndex < 1 then
+        return
+    end
+
+    self.SelectedItemSlotIndex = nextIndex
+    self:ClampSelectedIndex()
+
+    if horizontal and prevColumnNumber ~= curColumnNumber then
         local columnNumberDiff = curColumnNumber - self.FirstColumnNumber
 
         if columnNumberDiff >= SHARED_CONFIG.ITEM_DISPLAY_ROW_COUNT then
@@ -253,6 +309,7 @@ function PauseMenuController:MoveSelection(offset)
         elseif columnNumberDiff < 0 then
             self.FirstColumnNumber = curColumnNumber
         end
+        self:ClampFirstColumnNumber()
     end
 end
 
@@ -276,25 +333,25 @@ function PauseMenuController:HandlePauseMenuInput()
             controller
         )
     then
-        self:MoveSelection(-1)
+        self:MoveCursor(-1, false)
     elseif Input.IsActionTriggered(
             ButtonAction.ACTION_MENUDOWN,
             controller
         )
     then
-        self:MoveSelection(1)
+        self:MoveCursor(1, false)
     elseif Input.IsActionTriggered(
             ButtonAction.ACTION_MENULEFT,
             controller
         )
     then
-        self:MoveSelection(-SHARED_CONFIG.ITEM_DISPLAY_COLUMN_COUNT)
+        self:MoveCursor(-1, true)
     elseif Input.IsActionTriggered(
             ButtonAction.ACTION_MENURIGHT,
             controller
         )
     then
-        self:MoveSelection(SHARED_CONFIG.ITEM_DISPLAY_COLUMN_COUNT)
+        self:MoveCursor(1, true)
     end
 end
 
@@ -306,7 +363,6 @@ function PauseMenuController:OnPrePauseScreenRender(
         or PauseMenu.GetState() == PauseMenuStates.OPTIONS
     then
         self:ExitInspectMode()
-
         return
     end
 
@@ -323,42 +379,13 @@ function PauseMenuController:OnPrePauseScreenRender(
         self.Renderer:SetMyStuffPageIdle()
     end
 
-    if pauseBody then
-        for _, layer in ipairs(pauseBody:GetAllLayers()) do
-            local layerName = tostring(layer:GetName())
-
-            if layerName == "MyStuff" then
-                layer:SetVisible(false)
-            end
-        end
-    end
+    self.Renderer:HideOriginalMyStuffPage(pauseBody)
 
     if not self.InspectMode then
         return
     end
 
-    if pauseStats then
-        for _, layer in ipairs(pauseStats:GetAllLayers()) do
-            self:HideLayer("PauseStats", layer)
-        end
-    end
-
-    if pauseBody then
-        local targetLayers = {
-            Cursor = true,
-            Blood = true
-        }
-
-        self:ReplacePauseMenuSpritesheet(pauseBody)
-
-        for _, layer in ipairs(pauseBody:GetAllLayers()) do
-            local layerName = tostring(layer:GetName())
-
-            if targetLayers[layerName] then
-                self:HideLayer("PauseMenu", layer)
-            end
-        end
-    end
+    self.Renderer:HidePartialPauseMenu(pauseBody, pauseStats)
 end
 
 function PauseMenuController:OnPostPauseScreenRender(
@@ -384,21 +411,24 @@ function PauseMenuController:OnPostPauseScreenRender(
     if not self.PauseSessionActive then
         self.PauseSessionActive = true
         self:RefreshItemSlots()
+        self:PickPlayerWithItems()
     end
 
     self:HandlePauseMenuInput()
     self.Renderer:RenderMyStuffPage(
-        self.ItemSlots,
-        self.FirstColumnNumber
+        self:GetPlayerType(),
+        self:GetCurPlayerItemSlots(),
+        self.FirstColumnNumber,
+        self:GetPlayerCountWithItems()
     )
 
     if self.InspectMode then
-        local selectedSlot = self:GetSelectedSlot()
+        local selectedSlot = self:GetSelectedItemSlot()
 
         if selectedSlot then
             self.Renderer:RenderInspect(
                 selectedSlot,
-                self.SelectedIndex,
+                self.SelectedItemSlotIndex,
                 self.FirstColumnNumber
             )
         end
@@ -414,7 +444,6 @@ function PauseMenuController:OnPostRender()
 
     if self.InspectMode then
         self:ExitInspectMode()
-        self:ResetInspectMode()
     end
 
     self.PauseSessionActive = false
