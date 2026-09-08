@@ -280,15 +280,9 @@ function PauseMenuController:MoveCursor(offset, horizontal)
             or prevColumnNumber ~= curColumnNumber
         )
     then
-        local switchOffset = 1
-        if offset < 0 then
-            switchOffset = -1
-            self.SelectedItemSlotIndex = (prevColumnNumber - 1) * SHARED_CONFIG.ITEM_DISPLAY_COLUMN_COUNT + 1
-        else
-            self.SelectedItemSlotIndex = prevColumnNumber * SHARED_CONFIG.ITEM_DISPLAY_COLUMN_COUNT
-        end
-
+        local switchOffset = offset > 0 and 1 or -1
         self:SwitchPlayerItemsDisplay(switchOffset)
+
         return
     end
 
