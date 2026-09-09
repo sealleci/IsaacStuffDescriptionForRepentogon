@@ -73,14 +73,16 @@ function PauseMenuController:GetSinglePlayerItemSlots(playerIndex)
         return {}
     end
 
-    local history = player:GetHistory():SearchCollectibles()
+    local history = player:GetHistory():GetCollectiblesHistory()
     local itemIndex = 1
 
     for i = #history, 1, -1 do
+        local historyItem = history[i]
         table.insert(
             itemSlots,
             {
-                ID = history[i]:GetItemID(),
+                ID = historyItem:GetItemID(),
+                IsTrinket = historyItem:IsTrinket(),
                 Index = itemIndex
             }
         )
@@ -252,7 +254,7 @@ function PauseMenuController:MoveCursor(offset, horizontal)
     end
 
     if horizontal then
-        offset = offset * SHARED_CONFIG.ITEM_DISPLAY_COLUMN_COUNT
+        offset = offset * SHARED_CONFIG.ITEMS_DISPLAY_ROW_COUNT
     end
 
     local nextIndex = self.SelectedItemSlotIndex + offset
@@ -297,9 +299,9 @@ function PauseMenuController:MoveCursor(offset, horizontal)
     if horizontal and prevColumnNumber ~= curColumnNumber then
         local columnNumberDiff = curColumnNumber - self.FirstColumnNumber
 
-        if columnNumberDiff >= SHARED_CONFIG.ITEM_DISPLAY_ROW_COUNT then
+        if columnNumberDiff >= SHARED_CONFIG.ITEMS_DISPLAY_COLUMN_COUNT then
             self.FirstColumnNumber = curColumnNumber
-                - (SHARED_CONFIG.ITEM_DISPLAY_ROW_COUNT - 1)
+                - (SHARED_CONFIG.ITEMS_DISPLAY_COLUMN_COUNT - 1)
         elseif columnNumberDiff < 0 then
             self.FirstColumnNumber = curColumnNumber
         end
@@ -360,19 +362,6 @@ function PauseMenuController:OnPrePauseScreenRender(
         return
     end
 
-    local animation = pauseBody:GetAnimation()
-
-    if animation == "Appear"
-        or animation == "Dissapear"
-    then
-        self.Renderer:SetMyStuffPageFrame(
-            animation,
-            pauseBody:GetFrame()
-        )
-    else
-        self.Renderer:SetMyStuffPageIdle()
-    end
-
     self.Renderer:HideOriginalMyStuffPage(pauseBody)
 
     if not self.InspectMode then
@@ -398,7 +387,7 @@ function PauseMenuController:OnPostPauseScreenRender(
     if animation == "Appear"
         or animation == "Dissapear"
     then
-        self.Renderer:RenderEmptyMyStuffPage()
+        self.Renderer:RenderEmptyMyStuffPage(pauseBody)
         return
     end
 
@@ -410,6 +399,7 @@ function PauseMenuController:OnPostPauseScreenRender(
 
     self:HandlePauseMenuInput()
     self.Renderer:RenderMyStuffPage(
+        pauseBody,
         self:GetPlayerType(),
         self:GetCurPlayerItemSlots(),
         self.FirstColumnNumber,
@@ -421,6 +411,7 @@ function PauseMenuController:OnPostPauseScreenRender(
 
         if selectedSlot then
             self.Renderer:RenderInspect(
+                pauseBody,
                 selectedSlot,
                 self.SelectedItemSlotIndex,
                 self.FirstColumnNumber
@@ -548,20 +539,20 @@ function PauseMenuController:OnExecuteCommand(command, params)
         eidCenter.X,
         eidCenter.Y
     ))
-
     self:DumpSpriteInfo(
         "My Stuff",
         PauseMenu.GetMyStuffSprite()
     )
-
     self:DumpSpriteInfo(
         "Pause Menu",
         PauseMenu.GetSprite()
     )
-
     self:DumpSpriteInfo(
         "Pause Stats",
         PauseMenu.GetStatsSprite()
+    )
+    self.Renderer:DumpLayoutInfo(
+        PauseMenu.GetSprite()
     )
 end
 

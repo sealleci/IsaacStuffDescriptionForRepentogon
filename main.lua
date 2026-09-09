@@ -5,14 +5,18 @@ local MSD4R = RegisterMod(
 
 local EID_MOD_ID = "836319872"
 local Renderer = include("scripts/renderer")
-local PauseMenuController = include("scripts/pause_menu")
+local PauseMenuController = include("scripts/pause_menu_controller")
+local Settings = include("scripts/settings")
+local ModConfig = include("scripts/mod_config")
 
 MSD4R.Enabled = false
 MSD4R.EID = nil
+MSD4R.Settings = Settings
 
 function MSD4R:OnModsLoaded()
     if PauseMenu == nil
         or XMLData == nil
+        or Isaac.RenderCollectionItem == nil
         or ModCallbacks.MC_PRE_PAUSE_SCREEN_RENDER == nil
         or ModCallbacks.MC_POST_PAUSE_SCREEN_RENDER == nil
     then
@@ -34,11 +38,14 @@ function MSD4R:OnModsLoaded()
     self.EID = EID
     self.Enabled = true
 
+    Settings:Initialize(self)
     Renderer:Initialize(self)
     PauseMenuController:Initialize(
         self,
         Renderer
     )
+    ModConfig:Initialize(Settings)
+
     Isaac.ConsoleOutput("[MSD4R] Initialized successfully.\n")
 end
 
@@ -78,6 +85,24 @@ function MSD4R:OnPostRender()
     PauseMenuController:OnPostRender()
 end
 
+function MSD4R:OnPrePlayerHUDTrinketRender(
+    slot,
+    position,
+    scale,
+    player,
+    cropOffset
+)
+    --[[
+    Smelted trinkets are rendered in My Stuff page through this function.
+    Returns true to cancel rendering.
+    ]]
+    if not Game():IsPauseMenuOpen() then
+        return false
+    end
+
+    return true
+end
+
 function MSD4R:OnExecuteCommand(
     command,
     params
@@ -110,6 +135,11 @@ MSD4R:AddCallback(
 MSD4R:AddCallback(
     ModCallbacks.MC_POST_RENDER,
     MSD4R.OnPostRender
+)
+
+MSD4R:AddCallback(
+    ModCallbacks.MC_PRE_PLAYERHUD_TRINKET_RENDER,
+    MSD4R.OnPrePlayerHUDTrinketRender
 )
 
 MSD4R:AddCallback(

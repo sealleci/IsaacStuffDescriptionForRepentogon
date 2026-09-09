@@ -32,7 +32,7 @@ While the pause menu is open:
     [*] When the cursor reaches the rightmost item, pressing [b] Right [/b] again exits Inspect Mode and returns control to the pause menu.
 [/list]
     </description>
-    <version>0.1.0</version>
+    <version>0.5.0</version>
     <visibility>Public</visibility>
     <tag id="Lua"/>
     <tag id="Tweaks"/>
