@@ -283,8 +283,7 @@ function Renderer:GetFixedLayout()
             SHARED_CONFIG.ITEMS_DISPLAY_STEP_X,
             SHARED_CONFIG.ITEMS_DISPLAY_STEP_Y
         ),
-        OverlayDelta = offset,
-        MyStuffFrameInfo = {
+        MyStuffFrame = {
             Layer = nil,
             Frame = nil,
             Position = Vector(0, 0),
@@ -329,7 +328,7 @@ function Renderer:GetAutoLayout(frameInfo)
         ItemOrigin = itemOrigin,
         ItemScale = frameInfo.Scale,
         ItemStep = itemStep,
-        MyStuffFrameInfo = frameInfo,
+        MyStuffFrame = frameInfo,
     }
 end
 
@@ -710,9 +709,9 @@ function Renderer:RenderAvatar(
     playerCount,
     layout
 )
-    local renderPosition = layout.MyStuffFrameInfo.TopLeft
+    local renderPosition = layout.MyStuffFrame.TopLeft
         + self:MultiplyVector(
-            layout.MyStuffFrameInfo.Pivot,
+            layout.MyStuffFrame.Pivot,
             layout.ItemScale
         )
         + Vector(
@@ -865,28 +864,28 @@ function Renderer:RenderDescription(slot, layout)
 
     local renderPosition = self:GetPauseMenuAnchor()
     if layout
-        and layout.MyStuffFrameInfo
+        and layout.MyStuffFrame
     then
         if math.abs(Isaac.GetScreenWidth()
-                - (layout.MyStuffFrameInfo.TopLeft.X
-                    + layout.MyStuffFrameInfo.Size.X))
+                - (layout.MyStuffFrame.TopLeft.X
+                    + layout.MyStuffFrame.Size.X))
             >= CONFIG.DESCRIPTION_WIDTH
             + layout.ItemStep.X * 0.5
         then
-            renderPosition = layout.MyStuffFrameInfo.TopLeft
+            renderPosition = layout.MyStuffFrame.TopLeft
                 + self:MultiplyVector(
                     CONFIG.DESCRIPTION_DISPLAY_OFFSET,
                     layout.ItemScale
                 )
 
             if renderPosition.Y < 0 then
-                renderPosition.Y = layout.MyStuffFrameInfo.TopLeft.Y
-                    + layout.MyStuffFrameInfo.Pivot.Y
+                renderPosition.Y = layout.MyStuffFrame.TopLeft.Y
+                    + layout.MyStuffFrame.Pivot.Y
                     * layout.ItemScale.Y
             end
         else
-            renderPosition = layout.MyStuffFrameInfo.TopLeft
-                + Vector(0, layout.MyStuffFrameInfo.Size.Y)
+            renderPosition = layout.MyStuffFrame.TopLeft
+                + Vector(0, layout.MyStuffFrame.Size.Y)
                 + Vector(0, layout.ItemStep.X)
         end
     end
@@ -949,7 +948,7 @@ function Renderer:RenderMyStuffPage(
     playerCount
 )
     local layout = self:GetLayout(pauseBody)
-    if layout.MyStuffFrameInfo then
+    if layout.MyStuffFrame then
         self:RenderEmptyMyStuffPage(pauseBody)
     end
 
@@ -995,7 +994,7 @@ function Renderer:RenderMyStuffPage(
         end
     end
 
-    if layout.MyStuffFrameInfo then
+    if layout.MyStuffFrame then
         self:RenderStuffArrows(
             pauseBody,
             itemSlots,

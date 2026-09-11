@@ -5,7 +5,7 @@
 
 Adds item descriptions and item inspection controls to the **My Stuff** section of the pause menu in *The Binding of Isaac: Repentance+*.
 
-The mod supports collectibles, smelted trinkets, modded collectibles, and modded trinkets. It also supports viewing items from multiple in-game characters, including local co-op players and multi-character setups.
+The mod supports items, smelted trinkets, modded items, and modded trinkets. It also supports viewing items from multiple in-game characters, including local co-op players and multi-character setups.
 
 The My Stuff display can automatically adapt to the layout of other custom pause-menu mods, allowing item icons and related UI elements to follow repositioned or resized My Stuff pages.
 
