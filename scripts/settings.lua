@@ -3,10 +3,9 @@ local Settings = {}
 local DEFAULTS = {
     OffsetX = 0,
     OffsetY = 0,
-    LayoutMode = 1,     -- 1 = Auto, 2 = Fixed (legacy)
-    IconOutline = 1,    -- 1 = Off, 2 = Thin, 3 = Full
-    OutlineColor = 1,   -- 1 = Black, 2 = White
-    IconBrightness = 10 -- [5..20] => [0.5x..2.0x]
+    IconBrightness = 10, -- [5..20] => [0.5x..2.0x]
+    IconOutline = 1,     -- 1 = Off, 2 = Thin, 3 = Full
+    OutlineColor = 2     -- 1 = Black, 2 = White
 }
 
 function Settings:CopyDefaults()
@@ -24,12 +23,6 @@ function Settings:Clamp(value, minValue, maxValue)
 end
 
 function Settings:Normalize()
-    self.Data.LayoutMode = self:Clamp(
-        math.floor(tonumber(self.Data.LayoutMode)
-            or DEFAULTS.LayoutMode),
-        1,
-        2
-    )
     self.Data.OffsetX = self:Clamp(
         math.floor(tonumber(self.Data.OffsetX)
             or DEFAULTS.OffsetX),
@@ -42,6 +35,12 @@ function Settings:Normalize()
         -200,
         200
     )
+    self.Data.IconBrightness = self:Clamp(
+        math.floor(tonumber(self.Data.IconBrightness)
+            or DEFAULTS.IconBrightness),
+        5,
+        20
+    )
     self.Data.IconOutline = self:Clamp(
         math.floor(tonumber(self.Data.IconOutline)
             or DEFAULTS.IconOutline),
@@ -53,12 +52,6 @@ function Settings:Normalize()
             or DEFAULTS.OutlineColor),
         1,
         2
-    )
-    self.Data.IconBrightness = self:Clamp(
-        math.floor(tonumber(self.Data.IconBrightness)
-            or DEFAULTS.IconBrightness),
-        5,
-        20
     )
 end
 
@@ -131,10 +124,6 @@ function Settings:Set(key, value)
     self:Save()
 end
 
-function Settings:GetLayoutMode()
-    return self.Data.LayoutMode == 2 and "fixed" or "auto"
-end
-
 function Settings:GetOffset()
     return Vector(self.Data.OffsetX, self.Data.OffsetY)
 end
@@ -159,12 +148,24 @@ end
 
 function Settings:GetIconColor()
     local brightness = self.Data.IconBrightness / 10
+    if brightness <= 1 then
+        return Color(
+            brightness,
+            brightness,
+            brightness,
+            1
+        )
+    end
 
+    local colorOffset = brightness - 1
     return Color(
-        brightness,
-        brightness,
-        brightness,
-        1
+        1 - colorOffset,
+        1 - colorOffset,
+        1 - colorOffset,
+        1,
+        colorOffset,
+        colorOffset,
+        colorOffset
     )
 end
 

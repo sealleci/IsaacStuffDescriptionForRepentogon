@@ -3,10 +3,6 @@
 local ModConfig = {}
 local MENU_INFO = {
     CATEGORY = "My Stuff Desc",
-    LAYOUT_MODES = {
-        "Auto (follow custom layout)",
-        "Fixed (original layout)",
-    },
     OUTLINE_MODES = {
         "Off",
         "Thin",
@@ -27,29 +23,6 @@ function ModConfig:RegisterLayoutSettings()
         MENU_INFO.CATEGORY,
         "Layout",
         "My Stuff layout"
-    )
-    ModConfigMenu.AddSetting(
-        MENU_INFO.CATEGORY,
-        "Layout",
-        {
-            Type = ModConfigMenu.OptionType.NUMBER,
-            CurrentSetting = function()
-                return self.Settings.Data.LayoutMode
-            end,
-            Minimum = 1,
-            Maximum = #MENU_INFO.LAYOUT_MODES,
-            Display = function()
-                return "Layout mode: "
-                    .. MENU_INFO.LAYOUT_MODES[self.Settings.Data.LayoutMode]
-            end,
-            OnChange = function(value)
-                self.Settings:Set("LayoutMode", ModConfig:Round(value))
-            end,
-            Info = {
-                "Auto option follows other mods' custom layout.",
-                "Fixed option keeps the original position."
-            }
-        }
     )
     ModConfigMenu.AddSetting(
         MENU_INFO.CATEGORY,
@@ -109,6 +82,31 @@ function ModConfig:RegisterAppearanceSettings()
         {
             Type = ModConfigMenu.OptionType.NUMBER,
             CurrentSetting = function()
+                return self.Settings.Data.IconBrightness
+            end,
+            Minimum = 5,
+            Maximum = 20,
+            Display = function()
+                return string.format(
+                    "Icon brightness: %.1fx",
+                    self.Settings.Data.IconBrightness / 10
+                )
+            end,
+            OnChange = function(value)
+                self.Settings:Set("IconBrightness", self:Round(value))
+            end,
+            Info = {
+                "Adjusts brightness of item icons.",
+                "1.0x represents the original brightness."
+            }
+        }
+    )
+    ModConfigMenu.AddSetting(
+        MENU_INFO.CATEGORY,
+        "Appearance",
+        {
+            Type = ModConfigMenu.OptionType.NUMBER,
+            CurrentSetting = function()
                 return self.Settings.Data.IconOutline
             end,
             Minimum = 1,
@@ -147,31 +145,6 @@ function ModConfig:RegisterAppearanceSettings()
             }
         }
     )
-    ModConfigMenu.AddSetting(
-        MENU_INFO.CATEGORY,
-        "Appearance",
-        {
-            Type = ModConfigMenu.OptionType.NUMBER,
-            CurrentSetting = function()
-                return self.Settings.Data.IconBrightness
-            end,
-            Minimum = 5,
-            Maximum = 20,
-            Display = function()
-                return string.format(
-                    "Icon brightness: %.1fx",
-                    self.Settings.Data.IconBrightness / 10
-                )
-            end,
-            OnChange = function(value)
-                self.Settings:Set("IconBrightness", self:Round(value))
-            end,
-            Info = {
-                "Adjusts brightness of item icons.",
-                "1.0x preserves the original visibility of item icons."
-            }
-        }
-    )
 end
 
 function ModConfig:Initialize(settings)
@@ -180,8 +153,8 @@ function ModConfig:Initialize(settings)
     end
 
     self.Settings = settings
-    self:RegisterLayoutSettings()
     self:RegisterAppearanceSettings()
+    self:RegisterLayoutSettings()
 end
 
 return ModConfig

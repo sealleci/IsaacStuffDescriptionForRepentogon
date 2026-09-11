@@ -40,10 +40,7 @@ function MSD4R:OnModsLoaded()
 
     Settings:Initialize(self)
     Renderer:Initialize(self)
-    PauseMenuController:Initialize(
-        self,
-        Renderer
-    )
+    PauseMenuController:Initialize(self, Renderer)
     ModConfig:Initialize(Settings)
 
     Isaac.ConsoleOutput("[MSD4R] Initialized successfully.\n")

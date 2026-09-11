@@ -6,7 +6,11 @@
     <description>
 [h1] My Stuff Descriptions for REPENTOGON [/h1]
 
-Adds item descriptions and item inspection controls to the [b] My Stuff [/b] section of the pause menu in [i] The Binding of Isaac: Repentance+ [/i]. The mod also supports viewing items of multiple in-game characters, including local co-op players and multi-character setups.
+Adds item descriptions and item inspection controls to the [b] My Stuff [/b] section of the pause menu in [i] The Binding of Isaac: Repentance+ [/i].
+
+The mod supports collectibles, smelted trinkets, modded collectibles, and modded trinkets. It also supports viewing items from multiple in-game characters, including local co-op players and multi-character setups.
+
+The My Stuff display can automatically adapt to the layout of other custom pause-menu mods, allowing item icons and related UI elements to follow repositioned or resized My Stuff pages.
 
 The mod is designed for the REPENTOGON-compatible game version and uses [b] External Item Descriptions (EID) [/b] to provide item information.
 
@@ -26,13 +30,28 @@ Official Item Descriptions were introduced in [b] v1.9.7.13 [/b], which is newer
 
 While the pause menu is open:
 [list]
-    [*] Press [b] Left [/b] to enter [b] Inspect Mode [/b].
+    [*] Press [b] Left [/b] or [b] Right [/b] to enter [b] Inspect Mode [/b].
     [*] Use the [b] Up, Down, Left, and Right [/b] directional controls to move the cursor between items.
     [*] When the cursor reaches the topmost or bottommost item, pressing [b] Up [/b] or [b] Down [/b] again switches to another character's item list, if available.
-    [*] When the cursor reaches the rightmost item, pressing [b] Right [/b] again exits Inspect Mode and returns control to the pause menu.
+    [*] When the cursor reaches either horizontal edge of the item list, pressing [b] Left [/b] or [b] Right [/b] again in that direction exits Inspect Mode and returns control to the pause menu.
+[/list]
+
+[h2] Configuration [/h2]
+
+The mod provides additional options through Mod Config Menu:
+
+[b] Appearance [/b]
+[list]
+[*] Adjust the brightness of item and trinket icons.
+[*] Enable and customize icon outlines for better visibility against different pause-menu backgrounds.
+[/list]
+
+[b] Layout [/b]
+[list]
+[*] Adjust the rendering offset of the My Stuff display.
 [/list]
     </description>
-    <version>0.5.0</version>
+    <version>1.0.0</version>
     <visibility>Public</visibility>
     <tag id="Lua"/>
     <tag id="Tweaks"/>

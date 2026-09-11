@@ -262,10 +262,13 @@ function PauseMenuController:MoveCursor(offset, horizontal)
     local curColumnNumber = SHARED_CONFIG:GetColumnNumber(nextIndex)
     local maxColumnNumber = SHARED_CONFIG:GetColumnNumber(itemSlotsLength)
 
-    -- Exit inspect mode when the cursor reaches the right edge
+    -- Exit inspect mode when the cursor reaches the left or right edge
     if horizontal
-        and nextIndex > itemSlotsLength
-        and prevColumnNumber >= maxColumnNumber
+        and (
+            (nextIndex > itemSlotsLength
+                and prevColumnNumber >= maxColumnNumber)
+            or nextIndex < 1
+        )
     then
         self:ExitInspectMode()
         return
@@ -282,22 +285,19 @@ function PauseMenuController:MoveCursor(offset, horizontal)
             or prevColumnNumber ~= curColumnNumber
         )
     then
-        local switchOffset = offset > 0 and 1 or -1
-        self:SwitchPlayerItemsDisplay(switchOffset)
+        self:SwitchPlayerItemsDisplay(offset > 0 and 1 or -1)
 
-        return
-    end
-
-    -- Do nothing when the cursor reaches the left edge
-    if nextIndex < 1 then
         return
     end
 
     self.SelectedItemSlotIndex = nextIndex
     self:ClampSelectedIndex()
 
-    if horizontal and prevColumnNumber ~= curColumnNumber then
-        local columnNumberDiff = curColumnNumber - self.FirstColumnNumber
+    if horizontal
+        and prevColumnNumber ~= curColumnNumber
+    then
+        local columnNumberDiff = curColumnNumber
+            - self.FirstColumnNumber
 
         if columnNumberDiff >= SHARED_CONFIG.ITEMS_DISPLAY_COLUMN_COUNT then
             self.FirstColumnNumber = curColumnNumber
@@ -315,6 +315,10 @@ function PauseMenuController:HandlePauseMenuInput()
     if not self.InspectMode then
         if Input.IsActionTriggered(
                 ButtonAction.ACTION_MENULEFT,
+                controller
+            )
+            or Input.IsActionTriggered(
+                ButtonAction.ACTION_MENURIGHT,
                 controller
             )
         then
@@ -407,12 +411,12 @@ function PauseMenuController:OnPostPauseScreenRender(
     )
 
     if self.InspectMode then
-        local selectedSlot = self:GetSelectedItemSlot()
+        local selectedItemSlot = self:GetSelectedItemSlot()
 
-        if selectedSlot then
+        if selectedItemSlot then
             self.Renderer:RenderInspect(
                 pauseBody,
-                selectedSlot,
+                selectedItemSlot,
                 self.SelectedItemSlotIndex,
                 self.FirstColumnNumber
             )
@@ -434,126 +438,18 @@ function PauseMenuController:OnPostRender()
     self.PauseSessionActive = false
 end
 
-function PauseMenuController:DumpSpriteInfo(name, sprite)
-    if not sprite then
-        Isaac.ConsoleOutput(
-            "[MSD4R] "
-            .. name
-            .. ": nil\n"
-        )
-
-        return
-    end
-
-    Isaac.ConsoleOutput(
-        "\n[MSD4R] ===== "
-        .. name
-        .. " =====\n"
-    )
-
-    Isaac.ConsoleOutput(string.format(
-        "[MSD4R] spriteOffset=(%.1f, %.1f) "
-        .. "spriteScale=(%.3f, %.3f) "
-        .. "animation='%s' "
-        .. "frame=%d\n",
-        sprite.Offset.X,
-        sprite.Offset.Y,
-        sprite.Scale.X,
-        sprite.Scale.Y,
-        tostring(sprite:GetAnimation()),
-        sprite:GetFrame()
-    ))
-
-    for _, layer in ipairs(sprite:GetAllLayers()) do
-        local layerID = layer:GetLayerID()
-        local layerPos = layer:GetPos()
-        local frame = sprite:GetLayerFrameData(layerID)
-        local frameX = 0
-        local frameY = 0
-        local frameVisible = false
-
-        if frame then
-            local framePos = frame:GetPos()
-            frameX = framePos.X
-            frameY = framePos.Y
-            frameVisible = frame:IsVisible()
-        end
-
-        Isaac.ConsoleOutput(string.format(
-            "[MSD4R] "
-            .. "id=%d "
-            .. "name='%s' "
-            .. "visible=%s "
-            .. "layerPos=(%.1f, %.1f) "
-            .. "framePos=(%.1f, %.1f) "
-            .. "frameVisible=%s "
-            .. "sheet='%s'\n",
-            layerID,
-            tostring(layer:GetName()),
-            tostring(layer:IsVisible()),
-            layerPos.X,
-            layerPos.Y,
-            frameX,
-            frameY,
-            tostring(frameVisible),
-            tostring(layer:GetSpritesheetPath())
-        ))
-    end
-end
-
 function PauseMenuController:OnExecuteCommand(command, params)
     if command ~= "msd4r_dump" then
         return
     end
 
     if not game:IsPauseMenuOpen() then
-        Isaac.ConsoleOutput(
-            "[MSD4R] Open the pause menu first.\n"
-        )
+        Isaac.ConsoleOutput("[MSD4R] Open the pause menu first.\n")
 
         return
     end
 
-    local screenCenter = Vector(
-        math.floor(Isaac.GetScreenWidth() * 0.5),
-        math.floor(Isaac.GetScreenHeight() * 0.5)
-    )
-    local extraOffset = self.Renderer:GetPauseMenuExtraOffset()
-    local pauseAnchor = self.Renderer:GetPauseMenuAnchor()
-    local eidCenter = self.Mod.EID:getScreenSize() / 2
-
-    Isaac.ConsoleOutput(string.format(
-        "\n[MSD4R] screen=(%.1f, %.1f) "
-        .. "screenCenter=(%.1f, %.1f) "
-        .. "pauseExtra=(%.1f, %.1f) "
-        .. "pauseAnchor=(%.1f, %.1f) "
-        .. "eidCenter=(%.1f, %.1f)\n",
-        Isaac.GetScreenWidth(),
-        Isaac.GetScreenHeight(),
-        screenCenter.X,
-        screenCenter.Y,
-        extraOffset.X,
-        extraOffset.Y,
-        pauseAnchor.X,
-        pauseAnchor.Y,
-        eidCenter.X,
-        eidCenter.Y
-    ))
-    self:DumpSpriteInfo(
-        "My Stuff",
-        PauseMenu.GetMyStuffSprite()
-    )
-    self:DumpSpriteInfo(
-        "Pause Menu",
-        PauseMenu.GetSprite()
-    )
-    self:DumpSpriteInfo(
-        "Pause Stats",
-        PauseMenu.GetStatsSprite()
-    )
-    self.Renderer:DumpLayoutInfo(
-        PauseMenu.GetSprite()
-    )
+    self.Renderer:DumpRenderInfo()
 end
 
 return PauseMenuController
