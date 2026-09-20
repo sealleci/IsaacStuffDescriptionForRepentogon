@@ -316,8 +316,6 @@ function Renderer:GetAutoLayout(frameInfo)
         math.floor(itemStep.X * CONFIG.PIVOT_AT_ITEMS_DISPLAY_COLUMN_NUMBER + 0.5),
         math.floor(itemStep.Y * CONFIG.PIVOT_AT_ITEMS_DISPLAY_ROW_NUMBER + 0.5)
     )
-
-    -- Offset relative to the bottom-center origin.
     local itemOrigin = frameInfo.TopLeft
         + pivot
         - itemsDisplayOffset
@@ -866,19 +864,21 @@ function Renderer:RenderDescription(slot, layout)
     if layout
         and layout.MyStuffFrame
     then
+        local margin = SHARED_CONFIG.ITEMS_DISPLAY_STEP_X * 0.5
+        local renderOffset = self:MultiplyVector(
+            CONFIG.DESCRIPTION_DISPLAY_OFFSET,
+            layout.ItemScale
+        )
+
         if math.abs(Isaac.GetScreenWidth()
                 - (layout.MyStuffFrame.TopLeft.X
-                    + layout.MyStuffFrame.Size.X))
-            >= CONFIG.DESCRIPTION_WIDTH
-            + layout.ItemStep.X * 0.5
+                    + renderOffset.X))
+            >= CONFIG.DESCRIPTION_WIDTH + margin
         then
             renderPosition = layout.MyStuffFrame.TopLeft
-                + self:MultiplyVector(
-                    CONFIG.DESCRIPTION_DISPLAY_OFFSET,
-                    layout.ItemScale
-                )
+                + renderOffset
 
-            if renderPosition.Y < 0 then
+            if renderPosition.Y < margin then
                 renderPosition.Y = layout.MyStuffFrame.TopLeft.Y
                     + layout.MyStuffFrame.Pivot.Y
                     * layout.ItemScale.Y

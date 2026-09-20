@@ -67,15 +67,30 @@ end
 
 function PauseMenuController:GetSinglePlayerItemSlots(playerIndex)
     local itemSlots = {}
-    local player = Isaac.GetPlayer(playerIndex)
+    local itemIndex = 1
 
+    local player = Isaac.GetPlayer(playerIndex)
     if not player then
         return {}
     end
 
-    local history = player:GetHistory():GetCollectiblesHistory()
-    local itemIndex = 1
+    -- Add held trinkets to the beginning of the list
+    for i = 0, player:GetMaxTrinkets() - 1 do
+        local heldTrinketID = player:GetTrinket(i)
+        if heldTrinketID ~= TrinketType.TRINKET_NULL then
+            table.insert(
+                itemSlots,
+                {
+                    ID = heldTrinketID,
+                    IsTrinket = true,
+                    Index = itemIndex
+                }
+            )
+            itemIndex = itemIndex + 1
+        end
+    end
 
+    local history = player:GetHistory():GetCollectiblesHistory()
     for i = #history, 1, -1 do
         local historyItem = history[i]
         table.insert(
