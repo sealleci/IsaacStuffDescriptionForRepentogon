@@ -542,6 +542,10 @@ function Renderer:RenderItemIcon(
     position,
     scale
 )
+    if itemID < 0 then
+        itemID = 441
+    end
+
     local outlineMode = self.Settings:GetOutlineMode()
     local outlineColor = self.Settings:GetOutlineColor()
     local outlineOffsets = nil
