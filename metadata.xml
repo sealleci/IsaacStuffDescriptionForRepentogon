@@ -51,7 +51,7 @@ The mod provides additional options through Mod Config Menu:
 [*] Adjust the rendering offset of the My Stuff display.
 [/list]
     </description>
-    <version>1.0.1</version>
+    <version>1.0.2</version>
     <visibility>Public</visibility>
     <tag id="Lua"/>
     <tag id="Tweaks"/>
