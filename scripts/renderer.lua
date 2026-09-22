@@ -822,13 +822,49 @@ function Renderer:RenderCursor(
     )
 end
 
+function Renderer:GetGlitchedItemDescription(glitchedItemID)
+    glitchedItemID = glitchedItemID + 4294967296
+
+    local itemConfig = Isaac.GetItemConfig():GetCollectible(glitchedItemID)
+    if not itemConfig then
+        return nil
+    end
+
+    local successful, description = pcall(
+        self.EID.CheckGlitchedItemConfig,
+        self.EID,
+        glitchedItemID
+    )
+
+    if not successful then
+        Isaac.ConsoleOutput(
+            "[MSD4R] Failed to get glitched item description: "
+            .. tostring(description)
+            .. "\n"
+        )
+
+        return nil
+    end
+
+    return {
+        Name = itemConfig.Name .. " - {{Quality0}}",
+        Description = description
+    }
+end
+
 function Renderer:GetDescription(itemID, isTrinket)
+    if not isTrinket
+        and itemID < 0
+    then
+        return self:GetGlitchedItemDescription(itemID)
+    end
+
     local entityType = PickupVariant.PICKUP_COLLECTIBLE
     if isTrinket then
         entityType = PickupVariant.PICKUP_TRINKET
     end
 
-    local successful, result = pcall(
+    local successful, descriptionObj = pcall(
         self.EID.getDescriptionObj,
         self.EID,
         EntityType.ENTITY_PICKUP,
@@ -841,13 +877,25 @@ function Renderer:GetDescription(itemID, isTrinket)
     if not successful then
         Isaac.ConsoleOutput(string.format(
             "[MSD4R] Failed to get EID description: %s\n",
-            tostring(result)
+            tostring(descriptionObj)
         ))
 
         return nil
     end
 
-    return result
+    if not isTrinket then
+        local quality = descriptionObj.Quality
+        if not quality then
+            quality = 0
+        end
+
+        descriptionObj.Name = descriptionObj.Name
+            .. " - {{Quality"
+            .. tostring(quality)
+            .. "}}"
+    end
+
+    return descriptionObj
 end
 
 function Renderer:RenderDescription(slot, layout)
