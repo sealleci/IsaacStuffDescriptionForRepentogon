@@ -1,14 +1,16 @@
+local ModSave = {}
 local json = require("json")
-local Settings = {}
 local DEFAULTS = {
     OffsetX = 0,
     OffsetY = 0,
     IconBrightness = 10, -- [5..20] => [0.5x..2.0x]
     IconOutline = 1,     -- 1 = Off, 2 = Thin, 3 = Full
-    OutlineColor = 2     -- 1 = Black, 2 = White
+    OutlineColor = 2,    -- 1 = Black, 2 = White
+    RunSeed = 0,
+    Seeds = {}
 }
 
-function Settings:CopyDefaults()
+function ModSave:CopyDefaults()
     local defaults = {}
 
     for key, value in pairs(DEFAULTS) do
@@ -18,11 +20,11 @@ function Settings:CopyDefaults()
     return defaults
 end
 
-function Settings:Clamp(value, minValue, maxValue)
+function ModSave:Clamp(value, minValue, maxValue)
     return math.max(minValue, math.min(maxValue, value))
 end
 
-function Settings:Normalize()
+function ModSave:Normalize()
     self.Data.OffsetX = self:Clamp(
         math.floor(tonumber(self.Data.OffsetX)
             or DEFAULTS.OffsetX),
@@ -55,7 +57,7 @@ function Settings:Normalize()
     )
 end
 
-function Settings:Load()
+function ModSave:Load()
     if not self.Mod
         or not self.Mod:HasData()
     then
@@ -63,15 +65,19 @@ function Settings:Load()
     end
 
     local rawData = self.Mod:LoadData()
-    if not rawData or rawData == "" then
+    if not rawData
+        or rawData == ""
+    then
         return
     end
 
     local successful, decodedData = pcall(json.decode, rawData)
     if not successful
-        or type(decodedData) ~= "table" then
+        or type(decodedData) ~= "table"
+    then
         Isaac.ConsoleOutput(
-            "[MSD4R] Failed to load settings, default values will be applied.\n"
+            "[MSD4R] Failed to load save, "
+            .. "default values will be applied.\n"
         )
         return
     end
@@ -86,13 +92,13 @@ function Settings:Load()
     self:Normalize()
 end
 
-function Settings:Initialize(mod)
+function ModSave:Initialize(mod)
     self.Mod = mod
     self.Data = self:CopyDefaults()
     self:Load()
 end
 
-function Settings:Save()
+function ModSave:Save()
     if not self.Mod then
         return
     end
@@ -102,7 +108,7 @@ function Settings:Save()
     local successful, encodedData = pcall(json.encode, self.Data)
     if not successful then
         Isaac.ConsoleOutput(
-            "[MSD4R] Failed to encode settings: "
+            "[MSD4R] Failed to encode save: "
             .. tostring(encodedData)
             .. "\n"
         )
@@ -112,7 +118,7 @@ function Settings:Save()
     self.Mod:SaveData(encodedData)
 end
 
-function Settings:Set(key, value)
+function ModSave:Set(key, value)
     if DEFAULTS[key] == nil
         or type(DEFAULTS[key]) ~= type(value)
     then
@@ -120,15 +126,14 @@ function Settings:Set(key, value)
     end
 
     self.Data[key] = value
-    self:Normalize()
     self:Save()
 end
 
-function Settings:GetOffset()
+function ModSave:GetOffset()
     return Vector(self.Data.OffsetX, self.Data.OffsetY)
 end
 
-function Settings:GetOutlineMode()
+function ModSave:GetOutlineMode()
     if self.Data.IconOutline == 2 then
         return "thin"
     elseif self.Data.IconOutline == 3 then
@@ -138,7 +143,7 @@ function Settings:GetOutlineMode()
     return "off"
 end
 
-function Settings:GetOutlineColor()
+function ModSave:GetOutlineColor()
     if self.Data.OutlineColor == 2 then
         return Color(1, 1, 1, 1)
     end
@@ -146,7 +151,7 @@ function Settings:GetOutlineColor()
     return Color(0, 0, 0, 1)
 end
 
-function Settings:GetIconColor()
+function ModSave:GetIconColor()
     local brightness = self.Data.IconBrightness / 10
     if brightness <= 1 then
         return Color(
@@ -169,4 +174,12 @@ function Settings:GetIconColor()
     )
 end
 
-return Settings
+function ModSave:GetRunSeed()
+    return self.Data.RunSeed
+end
+
+function ModSave:GetSeeds()
+    return self.Data.Seeds
+end
+
+return ModSave

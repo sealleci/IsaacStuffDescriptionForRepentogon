@@ -1,4 +1,4 @@
-local SHARED_CONFIG = {
+local UI_CONFIG = {
     ITEMS_DISPLAY_ROW_COUNT = 4,
     ITEMS_DISPLAY_COLUMN_COUNT = 6,
     ITEMS_DISPLAY_STEP_X = 16,
@@ -12,4 +12,4 @@ local SHARED_CONFIG = {
     end
 }
 
-return SHARED_CONFIG
+return UI_CONFIG

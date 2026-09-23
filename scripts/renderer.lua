@@ -1,5 +1,7 @@
 local Renderer = {}
-local SHARED_CONFIG = include("scripts/shared_config")
+local GlitchedItemRenderer = include("scripts/glitched_item_renderer")
+local MAGIC_CONST = include("scripts/magic_const")
+local UI_CONFIG = include("scripts/ui_config")
 local CONFIG = {
     PAUSE_MENU_RENDER_ORIGIN_OFFSET = Vector(48, 0),
     PIVOT_AT_ITEMS_DISPLAY_ROW_NUMBER = 1 - (1 / 16),
@@ -96,7 +98,7 @@ local CONFIG = {
 function Renderer:Initialize(mod)
     self.Mod = mod
     self.EID = mod.EID
-    self.Settings = mod.Settings
+    self.ModSave = mod.ModSave
     self.HiddenPauseMenuLayers = {}
     self.PauseMenuSpritesheetReplaced = false
     self.ReplacedPauseMenuLayerName = nil
@@ -117,6 +119,8 @@ function Renderer:Initialize(mod)
         true
     )
     self.AvatarSprite:Play("Main", true)
+
+    GlitchedItemRenderer:Initialize()
 end
 
 function Renderer:MultiplyVector(left, right)
@@ -265,10 +269,10 @@ function Renderer:IsClassicMyStuffLayout(pauseBody)
 end
 
 function Renderer:GetFixedLayout()
-    local offset = self.Settings:GetOffset()
+    local offset = self.ModSave:GetOffset()
     local itemsDisplayOffset = Vector(
-        math.floor(SHARED_CONFIG.ITEMS_DISPLAY_STEP_X * CONFIG.PIVOT_AT_ITEMS_DISPLAY_COLUMN_NUMBER + 0.5),
-        math.floor(SHARED_CONFIG.ITEMS_DISPLAY_STEP_Y * CONFIG.PIVOT_AT_ITEMS_DISPLAY_ROW_NUMBER + 0.5)
+        math.floor(UI_CONFIG.ITEMS_DISPLAY_STEP_X * CONFIG.PIVOT_AT_ITEMS_DISPLAY_COLUMN_NUMBER + 0.5),
+        math.floor(UI_CONFIG.ITEMS_DISPLAY_STEP_Y * CONFIG.PIVOT_AT_ITEMS_DISPLAY_ROW_NUMBER + 0.5)
     )
     local itemOrigin = CONFIG.FIXED_MY_STUFF_PAGE_TOP_LEFT
         + CONFIG.FIXED_MY_STUFF_PAGE_PIVOT
@@ -280,8 +284,8 @@ function Renderer:GetFixedLayout()
         ItemOrigin = itemOrigin,
         ItemScale = Vector(1, 1),
         ItemStep = Vector(
-            SHARED_CONFIG.ITEMS_DISPLAY_STEP_X,
-            SHARED_CONFIG.ITEMS_DISPLAY_STEP_Y
+            UI_CONFIG.ITEMS_DISPLAY_STEP_X,
+            UI_CONFIG.ITEMS_DISPLAY_STEP_Y
         ),
         MyStuffFrame = {
             Layer = nil,
@@ -307,8 +311,8 @@ function Renderer:GetAutoLayout(frameInfo)
         frameInfo.Scale
     )
     local itemStep = Vector(
-        SHARED_CONFIG.ITEMS_DISPLAY_STEP_X * frameInfo.Scale.X,
-        SHARED_CONFIG.ITEMS_DISPLAY_STEP_Y * frameInfo.Scale.Y
+        UI_CONFIG.ITEMS_DISPLAY_STEP_X * frameInfo.Scale.X,
+        UI_CONFIG.ITEMS_DISPLAY_STEP_Y * frameInfo.Scale.Y
     )
 
     -- Pivot is at the 2nd row, 3rd column of item list.
@@ -319,7 +323,7 @@ function Renderer:GetAutoLayout(frameInfo)
     local itemOrigin = frameInfo.TopLeft
         + pivot
         - itemsDisplayOffset
-        + self.Settings:GetOffset()
+        + self.ModSave:GetOffset()
 
     return {
         Mode = "auto",
@@ -345,7 +349,7 @@ function Renderer:GetLayout(pauseBody)
 end
 
 function Renderer:ReplacePauseMenuSpritesheet(pauseBody)
-    function ReplaceSpritesheet(layerName, imagePath)
+    local function replaceSpritesheet(layerName, imagePath)
         for _, layer in ipairs(pauseBody:GetAllLayers()) do
             if layer:GetName() == layerName then
                 local layerID = layer:GetLayerID()
@@ -367,7 +371,7 @@ function Renderer:ReplacePauseMenuSpritesheet(pauseBody)
     end
 
     if not self:IsClassicMyStuffLayout(pauseBody) then
-        ReplaceSpritesheet(
+        replaceSpritesheet(
             "PaperFrame",
             "gfx/ui/pausescreen_mini_msd4r.png"
         )
@@ -375,7 +379,7 @@ function Renderer:ReplacePauseMenuSpritesheet(pauseBody)
         return
     end
 
-    ReplaceSpritesheet(
+    replaceSpritesheet(
         "Paper",
         "gfx/ui/pausescreen_msd4r.png"
     )
@@ -540,14 +544,38 @@ end
 function Renderer:RenderItemIcon(
     itemID,
     position,
-    scale
+    scale,
+    proceduralSeed
 )
-    if itemID < 0 then
-        itemID = 441
+    local function renderConditionally(renderPosition, color)
+        local currentItemID = itemID
+        local renderedGlitchedItemIcon = false
+
+        if currentItemID < 0 then
+            renderedGlitchedItemIcon = GlitchedItemRenderer:RenderItemIcon(
+                proceduralSeed,
+                renderPosition,
+                scale,
+                color
+            )
+
+            if not renderedGlitchedItemIcon then
+                currentItemID = 441
+            end
+        end
+
+        if not renderedGlitchedItemIcon then
+            Isaac.RenderCollectionItem(
+                currentItemID,
+                renderPosition,
+                scale,
+                color
+            )
+        end
     end
 
-    local outlineMode = self.Settings:GetOutlineMode()
-    local outlineColor = self.Settings:GetOutlineColor()
+    local outlineMode = self.ModSave:GetOutlineMode()
+    local outlineColor = self.ModSave:GetOutlineColor()
     local outlineOffsets = nil
     if outlineMode == "thin" then
         outlineOffsets = CONFIG.THIN_OUTLINE_OFFSETS
@@ -557,20 +585,16 @@ function Renderer:RenderItemIcon(
 
     if outlineOffsets then
         for _, offset in ipairs(outlineOffsets) do
-            Isaac.RenderCollectionItem(
-                itemID,
+            renderConditionally(
                 position + offset,
-                scale,
                 outlineColor
             )
         end
     end
 
-    Isaac.RenderCollectionItem(
-        itemID,
+    renderConditionally(
         position,
-        scale,
-        self.Settings:GetIconColor()
+        self.ModSave:GetIconColor()
     )
 end
 
@@ -628,7 +652,7 @@ function Renderer:RenderTrinketIcon(
         return
     end
 
-    local outlineMode = self.Settings:GetOutlineMode()
+    local outlineMode = self.ModSave:GetOutlineMode()
     local outlineOffsets = nil
     if outlineMode == "thin" then
         outlineOffsets = CONFIG.THIN_OUTLINE_OFFSETS
@@ -637,7 +661,7 @@ function Renderer:RenderTrinketIcon(
     end
 
     self.TrinketSprite.Scale = scale
-    self.TrinketSprite.Color = self.Settings:GetOutlineColor()
+    self.TrinketSprite.Color = self.ModSave:GetOutlineColor()
 
     if outlineOffsets then
         for _, offset in ipairs(outlineOffsets) do
@@ -648,7 +672,7 @@ function Renderer:RenderTrinketIcon(
         end
     end
 
-    self.TrinketSprite.Color = self.Settings:GetIconColor()
+    self.TrinketSprite.Color = self.ModSave:GetIconColor()
     self.TrinketSprite:RenderLayer(
         layer:GetLayerID(),
         position
@@ -657,13 +681,13 @@ end
 
 function Renderer:RenderStuffArrows(
     pauseBody,
-    itemSlots,
+    itemCount,
     firstColumnNumber
 )
-    local lastColumnNumber = SHARED_CONFIG:GetColumnNumber(#itemSlots)
+    local lastColumnNumber = UI_CONFIG:GetColumnNumber(itemCount)
     local hasLeftColumn = firstColumnNumber > 1
     local hasRightColumn = firstColumnNumber
-        + (SHARED_CONFIG.ITEMS_DISPLAY_COLUMN_COUNT - 1)
+        + (UI_CONFIG.ITEMS_DISPLAY_COLUMN_COUNT - 1)
         < lastColumnNumber
 
     if hasLeftColumn then
@@ -720,7 +744,7 @@ function Renderer:RenderAvatar(
             0,
             layout.ItemStep.Y * (layout.Mode == "fixed" and 3.5 or 4)
         )
-        + self.Settings:GetOffset()
+        + self.ModSave:GetOffset()
 
     local avatarLayerID = CONFIG.PLAYER_TYPE_TO_AVATAR_LAYER_ID[playerType]
     local modAvatarRendered = false
@@ -777,9 +801,9 @@ function Renderer:GetItemSlotPosition(
     layout
 )
     local columnNumber = (index - 1)
-        // SHARED_CONFIG.ITEMS_DISPLAY_ROW_COUNT + 1
+        // UI_CONFIG.ITEMS_DISPLAY_ROW_COUNT + 1
     local rowNumber = (index - 1)
-        % SHARED_CONFIG.ITEMS_DISPLAY_ROW_COUNT
+        % UI_CONFIG.ITEMS_DISPLAY_ROW_COUNT
 
     return layout.ItemOrigin
         + Vector(
@@ -823,7 +847,7 @@ function Renderer:RenderCursor(
 end
 
 function Renderer:GetGlitchedItemDescription(glitchedItemID)
-    glitchedItemID = glitchedItemID + 4294967296
+    glitchedItemID = glitchedItemID + MAGIC_CONST.GLITCHED_ITEM_MASK
 
     local itemConfig = Isaac.GetItemConfig():GetCollectible(glitchedItemID)
     if not itemConfig then
@@ -916,7 +940,7 @@ function Renderer:RenderDescription(slot, layout)
     if layout
         and layout.MyStuffFrame
     then
-        local margin = SHARED_CONFIG.ITEMS_DISPLAY_STEP_X * 0.5
+        local margin = UI_CONFIG.ITEMS_DISPLAY_STEP_X * 0.5
         local renderOffset = self:MultiplyVector(
             CONFIG.DESCRIPTION_DISPLAY_OFFSET,
             layout.ItemScale
@@ -941,9 +965,9 @@ function Renderer:RenderDescription(slot, layout)
                 + Vector(0, layout.ItemStep.X)
         end
     end
-    renderPosition = renderPosition + self.Settings:GetOffset()
+    renderPosition = renderPosition + self.ModSave:GetOffset()
 
-    local successful, err = pcall(function()
+    local successful, error = pcall(function()
         local textScale = Vector(
             self.EID.Scale,
             self.EID.Scale
@@ -983,7 +1007,7 @@ function Renderer:RenderDescription(slot, layout)
     if not successful then
         Isaac.ConsoleOutput(string.format(
             "[MSD4R] EID rendering error: %s\n",
-            tostring(err)
+            tostring(error)
         ))
     end
 end
@@ -1004,21 +1028,23 @@ function Renderer:RenderMyStuffPage(
         self:RenderEmptyMyStuffPage(pauseBody)
     end
 
-    if not itemSlots then
+    if not itemSlots
+        or #itemSlots < 1
+    then
         return
     end
 
     local firstVisibleIndex = (firstColumnNumber - 1)
-        * SHARED_CONFIG.ITEMS_DISPLAY_ROW_COUNT + 1
-    local maxItemCount = SHARED_CONFIG.ITEMS_DISPLAY_COLUMN_COUNT
-        * SHARED_CONFIG.ITEMS_DISPLAY_ROW_COUNT
+        * UI_CONFIG.ITEMS_DISPLAY_ROW_COUNT + 1
+    local maxItemCount = UI_CONFIG.ITEMS_DISPLAY_COLUMN_COUNT
+        * UI_CONFIG.ITEMS_DISPLAY_ROW_COUNT
     local lastVisibleIndex = math.min(
         #itemSlots,
         firstVisibleIndex + maxItemCount - 1
     )
 
     if layout.Mode == "fixed" then
-        self.Settings:Set("IconBrightness", 20)
+        self.ModSave:Set("IconBrightness", 20)
     end
 
     for i = firstVisibleIndex, lastVisibleIndex do
@@ -1034,7 +1060,8 @@ function Renderer:RenderMyStuffPage(
                 self:RenderItemIcon(
                     itemSlot.ID,
                     position,
-                    layout.ItemScale
+                    layout.ItemScale,
+                    itemSlot.ProceduralSeed
                 )
             else
                 self:RenderTrinketIcon(
@@ -1049,7 +1076,7 @@ function Renderer:RenderMyStuffPage(
     if layout.MyStuffFrame then
         self:RenderStuffArrows(
             pauseBody,
-            itemSlots,
+            #itemSlots,
             firstColumnNumber
         )
     end

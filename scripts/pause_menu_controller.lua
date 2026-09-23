@@ -1,10 +1,11 @@
 local PauseMenuController = {}
 local game = Game()
-local SHARED_CONFIG = include("scripts/shared_config")
+local UI_CONFIG = include("scripts/ui_config")
 
-function PauseMenuController:Initialize(mod, renderer)
+function PauseMenuController:Initialize(mod, renderer, proceduralSeedTracker)
     self.Mod = mod
     self.Renderer = renderer
+    self.ProceduralSeedTracker = proceduralSeedTracker
     self.PlayerIndex = 0
     self.PlayerInputIndex = 0
     self.AllPlayersItemSlots = {}
@@ -30,7 +31,7 @@ function PauseMenuController:ClampFirstColumnNumber()
         1,
         math.min(
             self.FirstColumnNumber,
-            SHARED_CONFIG:GetColumnNumber(#(self.AllPlayersItemSlots[self.PlayerIndex] or {}))
+            UI_CONFIG:GetColumnNumber(#(self.AllPlayersItemSlots[self.PlayerIndex] or {}))
         )
     )
 end
@@ -83,7 +84,8 @@ function PauseMenuController:GetSinglePlayerItemSlots(playerIndex)
                 {
                     ID = heldTrinketID,
                     IsTrinket = true,
-                    Index = itemIndex
+                    Index = itemIndex,
+                    ProceduralSeed = 0
                 }
             )
             itemIndex = itemIndex + 1
@@ -93,12 +95,16 @@ function PauseMenuController:GetSinglePlayerItemSlots(playerIndex)
     local history = player:GetHistory():GetCollectiblesHistory()
     for i = #history, 1, -1 do
         local historyItem = history[i]
+        local itemID = historyItem:GetItemID()
+        local proceduralSeed = self.ProceduralSeedTracker:GetSeed(itemID)
+
         table.insert(
             itemSlots,
             {
-                ID = historyItem:GetItemID(),
+                ID = itemID,
                 IsTrinket = historyItem:IsTrinket(),
-                Index = itemIndex
+                Index = itemIndex,
+                ProceduralSeed = proceduralSeed
             }
         )
         itemIndex = itemIndex + 1
@@ -269,13 +275,13 @@ function PauseMenuController:MoveCursor(offset, horizontal)
     end
 
     if horizontal then
-        offset = offset * SHARED_CONFIG.ITEMS_DISPLAY_ROW_COUNT
+        offset = offset * UI_CONFIG.ITEMS_DISPLAY_ROW_COUNT
     end
 
     local nextIndex = self.SelectedItemSlotIndex + offset
-    local prevColumnNumber = SHARED_CONFIG:GetColumnNumber(self.SelectedItemSlotIndex)
-    local curColumnNumber = SHARED_CONFIG:GetColumnNumber(nextIndex)
-    local maxColumnNumber = SHARED_CONFIG:GetColumnNumber(itemSlotsLength)
+    local prevColumnNumber = UI_CONFIG:GetColumnNumber(self.SelectedItemSlotIndex)
+    local curColumnNumber = UI_CONFIG:GetColumnNumber(nextIndex)
+    local maxColumnNumber = UI_CONFIG:GetColumnNumber(itemSlotsLength)
 
     -- Exit inspect mode when the cursor reaches the left or right edge
     if horizontal
@@ -314,9 +320,9 @@ function PauseMenuController:MoveCursor(offset, horizontal)
         local columnNumberDiff = curColumnNumber
             - self.FirstColumnNumber
 
-        if columnNumberDiff >= SHARED_CONFIG.ITEMS_DISPLAY_COLUMN_COUNT then
+        if columnNumberDiff >= UI_CONFIG.ITEMS_DISPLAY_COLUMN_COUNT then
             self.FirstColumnNumber = curColumnNumber
-                - (SHARED_CONFIG.ITEMS_DISPLAY_COLUMN_COUNT - 1)
+                - (UI_CONFIG.ITEMS_DISPLAY_COLUMN_COUNT - 1)
         elseif columnNumberDiff < 0 then
             self.FirstColumnNumber = curColumnNumber
         end

@@ -1,0 +1,5 @@
+local MAGIC_CONST = {
+    GLITCHED_ITEM_MASK = 4294967296
+}
+
+return MAGIC_CONST

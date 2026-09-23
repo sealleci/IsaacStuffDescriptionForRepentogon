@@ -30,16 +30,16 @@ function ModConfig:RegisterLayoutSettings()
         {
             Type = ModConfigMenu.OptionType.NUMBER,
             CurrentSetting = function()
-                return self.Settings.Data.OffsetX
+                return self.ModSave.Data.OffsetX
             end,
             Minimum = -200,
             Maximum = 200,
             Display = function()
                 return "Horizontal offset: "
-                    .. tostring(self.Settings.Data.OffsetX)
+                    .. tostring(self.ModSave.Data.OffsetX)
             end,
             OnChange = function(value)
-                self.Settings:Set("OffsetX", ModConfig:Round(value))
+                self.ModSave:Set("OffsetX", ModConfig:Round(value))
             end,
             Info = {
                 "Adjusts content horizontally in screen pixels."
@@ -52,16 +52,16 @@ function ModConfig:RegisterLayoutSettings()
         {
             Type = ModConfigMenu.OptionType.NUMBER,
             CurrentSetting = function()
-                return self.Settings.Data.OffsetY
+                return self.ModSave.Data.OffsetY
             end,
             Minimum = -200,
             Maximum = 200,
             Display = function()
                 return "Vertical offset: "
-                    .. tostring(self.Settings.Data.OffsetY)
+                    .. tostring(self.ModSave.Data.OffsetY)
             end,
             OnChange = function(value)
-                self.Settings:Set("OffsetY", self:Round(value))
+                self.ModSave:Set("OffsetY", self:Round(value))
             end,
             Info = {
                 "Adjusts content vertically in screen pixels."
@@ -82,18 +82,18 @@ function ModConfig:RegisterAppearanceSettings()
         {
             Type = ModConfigMenu.OptionType.NUMBER,
             CurrentSetting = function()
-                return self.Settings.Data.IconBrightness
+                return self.ModSave.Data.IconBrightness
             end,
             Minimum = 5,
             Maximum = 20,
             Display = function()
                 return string.format(
                     "Icon brightness: %.1fx",
-                    self.Settings.Data.IconBrightness / 10
+                    self.ModSave.Data.IconBrightness / 10
                 )
             end,
             OnChange = function(value)
-                self.Settings:Set("IconBrightness", self:Round(value))
+                self.ModSave:Set("IconBrightness", self:Round(value))
             end,
             Info = {
                 "Adjusts brightness of item icons.",
@@ -107,16 +107,16 @@ function ModConfig:RegisterAppearanceSettings()
         {
             Type = ModConfigMenu.OptionType.NUMBER,
             CurrentSetting = function()
-                return self.Settings.Data.IconOutline
+                return self.ModSave.Data.IconOutline
             end,
             Minimum = 1,
             Maximum = #MENU_INFO.OUTLINE_MODES,
             Display = function()
                 return "Icon outline: "
-                    .. MENU_INFO.OUTLINE_MODES[self.Settings.Data.IconOutline]
+                    .. MENU_INFO.OUTLINE_MODES[self.ModSave.Data.IconOutline]
             end,
             OnChange = function(value)
-                self.Settings:Set("IconOutline", self:Round(value))
+                self.ModSave:Set("IconOutline", self:Round(value))
             end,
             Info = {
                 "Adds a contrast outline around item icons."
@@ -129,16 +129,16 @@ function ModConfig:RegisterAppearanceSettings()
         {
             Type = ModConfigMenu.OptionType.NUMBER,
             CurrentSetting = function()
-                return self.Settings.Data.OutlineColor
+                return self.ModSave.Data.OutlineColor
             end,
             Minimum = 1,
             Maximum = #MENU_INFO.OUTLINE_COLORS,
             Display = function()
                 return "Outline color: "
-                    .. MENU_INFO.OUTLINE_COLORS[self.Settings.Data.OutlineColor]
+                    .. MENU_INFO.OUTLINE_COLORS[self.ModSave.Data.OutlineColor]
             end,
             OnChange = function(value)
-                self.Settings:Set("OutlineColor", self:Round(value))
+                self.ModSave:Set("OutlineColor", self:Round(value))
             end,
             Info = {
                 "Changes color of outline around item icons."
@@ -147,12 +147,12 @@ function ModConfig:RegisterAppearanceSettings()
     )
 end
 
-function ModConfig:Initialize(settings)
+function ModConfig:Initialize(modSave)
     if ModConfigMenu == nil then
         return
     end
 
-    self.Settings = settings
+    self.ModSave = modSave
     self:RegisterAppearanceSettings()
     self:RegisterLayoutSettings()
 end

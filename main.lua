@@ -2,16 +2,17 @@ local MSD4R = RegisterMod(
     "My Stuff Descriptions for Repentogon",
     1
 )
-
 local EID_MOD_ID = "836319872"
-local Renderer = include("scripts/renderer")
-local PauseMenuController = include("scripts/pause_menu_controller")
-local Settings = include("scripts/settings")
 local ModConfig = include("scripts/mod_config")
+local ModSave = include("scripts/mod_save")
+local PauseMenuController = include("scripts/pause_menu_controller")
+local ProceduralSeedTracker = include("scripts/procedural_seed_tracker")
+local Renderer = include("scripts/renderer")
+local game = Game()
 
 MSD4R.Enabled = false
 MSD4R.EID = nil
-MSD4R.Settings = Settings
+MSD4R.ModSave = ModSave
 
 function MSD4R:OnModsLoaded()
     if PauseMenu == nil
@@ -38,10 +39,11 @@ function MSD4R:OnModsLoaded()
     self.EID = EID
     self.Enabled = true
 
-    Settings:Initialize(self)
+    ModSave:Initialize(self)
+    ModConfig:Initialize(ModSave)
     Renderer:Initialize(self)
-    PauseMenuController:Initialize(self, Renderer)
-    ModConfig:Initialize(Settings)
+    ProceduralSeedTracker:Initialize(self)
+    PauseMenuController:Initialize(self, Renderer, ProceduralSeedTracker)
 
     Isaac.ConsoleOutput("[MSD4R] Initialized successfully.\n")
 end
@@ -93,11 +95,19 @@ function MSD4R:OnPrePlayerHUDTrinketRender(
     Smelted trinkets are rendered in My Stuff page through this function.
     Returns true to cancel rendering.
     ]]
-    if not Game():IsPauseMenuOpen() then
+    if not game:IsPauseMenuOpen() then
         return false
     end
 
     return true
+end
+
+function MSD4R:OnPostPickupUpdate(pickup)
+    ProceduralSeedTracker:OnPostPickupUpdate(pickup)
+end
+
+function MSD4R:OnPostGameStarted(isContinued)
+    ProceduralSeedTracker:OnPostGameStarted(isContinued)
 end
 
 function MSD4R:OnExecuteCommand(
@@ -137,6 +147,17 @@ MSD4R:AddCallback(
 MSD4R:AddCallback(
     ModCallbacks.MC_PRE_PLAYERHUD_TRINKET_RENDER,
     MSD4R.OnPrePlayerHUDTrinketRender
+)
+
+MSD4R:AddCallback(
+    ModCallbacks.MC_POST_PICKUP_UPDATE,
+    MSD4R.OnPostPickupUpdate,
+    PickupVariant.PICKUP_COLLECTIBLE
+)
+
+MSD4R:AddCallback(
+    ModCallbacks.MC_POST_GAME_STARTED,
+    MSD4R.OnPostGameStarted
 )
 
 MSD4R:AddCallback(
