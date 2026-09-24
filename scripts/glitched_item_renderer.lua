@@ -551,7 +551,7 @@ function GlitchedItemRenderer:EffectMatches(candidate, effect)
 
     if candidate.Score ~= nil
         and effect.Score ~= nil
-        and not self:ScoresApproximatelyEqual(
+        and not self:ScoresEqualApproximately(
             candidate.Score,
             effect.Score
         )
