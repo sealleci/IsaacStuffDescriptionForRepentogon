@@ -117,14 +117,14 @@ function GlitchedItemRenderer:GetEffectNextRNG(state)
     return state
 end
 
-function GlitchedItemRenderer:GetEffectRandomInt(state, max)
+function GlitchedItemRenderer:GetEffectRandomInt(state, maxValue)
     state = self:GetEffectNextRNG(state)
 
-    if not max or max <= 0 then
+    if not maxValue or maxValue <= 0 then
         return state, 0
     end
 
-    return state, state % max
+    return state, state % maxValue
 end
 
 function GlitchedItemRenderer:GetEffectRandomFloat(state)

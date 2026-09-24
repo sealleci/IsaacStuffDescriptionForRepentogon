@@ -1,5 +1,6 @@
 local ModSave = {}
 local json = require("json")
+local Utility = include("scripts/utility")
 local DEFAULTS = {
     OffsetX = 0,
     OffsetY = 0,
@@ -21,43 +22,38 @@ function ModSave:CopyDefaults()
     return defaults
 end
 
-function ModSave:Clamp(value, minValue, maxValue)
-    return math.max(minValue, math.min(maxValue, value))
-end
-
 function ModSave:Normalize()
-    self.Data.OffsetX = self:Clamp(
+    self.Data.OffsetX = Utility.Clamp(
         math.floor(tonumber(self.Data.OffsetX)
             or DEFAULTS.OffsetX),
         -200,
         200
     )
-    self.Data.OffsetY = self:Clamp(
+    self.Data.OffsetY = Utility.Clamp(
         math.floor(tonumber(self.Data.OffsetY)
             or DEFAULTS.OffsetY),
         -200,
         200
     )
-    self.Data.IconBrightness = self:Clamp(
+    self.Data.IconBrightness = Utility.Clamp(
         math.floor(tonumber(self.Data.IconBrightness)
             or DEFAULTS.IconBrightness),
         5,
         20
     )
-    self.Data.IconOutline = self:Clamp(
+    self.Data.IconOutline = Utility.Clamp(
         math.floor(tonumber(self.Data.IconOutline)
             or DEFAULTS.IconOutline),
         1,
         3
     )
-    self.Data.OutlineColor = self:Clamp(
+    self.Data.OutlineColor = Utility.Clamp(
         math.floor(tonumber(self.Data.OutlineColor)
             or DEFAULTS.OutlineColor),
         1,
         2
     )
-
-    self.Data.ExtraRNG = self:Clamp(
+    self.Data.ExtraRNG = Utility.Clamp(
         math.floor(tonumber(self.Data.ExtraRNG)
             or DEFAULTS.ExtraRNG),
         0,
