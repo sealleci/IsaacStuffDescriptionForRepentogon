@@ -136,15 +136,15 @@ end
 function GlitchedItemRenderer:AdjustItemID(itemID)
     local adjustedItemID = itemID
 
-    -- if itemID > 360 then
-    --     adjustedItemID = adjustedItemID + 1
-    -- end
-    -- if itemID > 396 then
-    --     adjustedItemID = adjustedItemID + 3
-    -- end
-    -- if itemID > 552 then
-    --     adjustedItemID = adjustedItemID + 4
-    -- end
+    if itemID > 360 then
+        adjustedItemID = adjustedItemID + 1
+    end
+    if itemID > 396 then
+        adjustedItemID = adjustedItemID + 3
+    end
+    if itemID > 552 then
+        adjustedItemID = adjustedItemID + 4
+    end
 
     return adjustedItemID
 end
