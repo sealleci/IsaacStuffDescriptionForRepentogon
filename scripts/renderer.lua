@@ -120,7 +120,7 @@ function Renderer:Initialize(mod)
     )
     self.AvatarSprite:Play("Main", true)
 
-    GlitchedItemRenderer:Initialize()
+    GlitchedItemRenderer:Initialize(mod.ModSave)
 end
 
 function Renderer:MultiplyVector(left, right)
@@ -553,6 +553,7 @@ function Renderer:RenderItemIcon(
 
         if currentItemID < 0 then
             renderedGlitchedItemIcon = GlitchedItemRenderer:RenderItemIcon(
+                currentItemID,
                 proceduralSeed,
                 renderPosition,
                 scale,

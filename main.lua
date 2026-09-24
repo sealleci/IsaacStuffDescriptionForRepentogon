@@ -106,6 +106,24 @@ function MSD4R:OnPostPickupUpdate(pickup)
     ProceduralSeedTracker:OnPostPickupUpdate(pickup)
 end
 
+function MSD4R:OnPostGetCollectible(
+    selectedCollectible,
+    itemPoolType,
+    decrease,
+    seed
+)
+    if not self.Enabled then
+        return
+    end
+
+    ProceduralSeedTracker:OnPostGetCollectible(
+        selectedCollectible,
+        itemPoolType,
+        decrease,
+        seed
+    )
+end
+
 function MSD4R:OnPostGameStarted(isContinued)
     ProceduralSeedTracker:OnPostGameStarted(isContinued)
 end
@@ -153,6 +171,11 @@ MSD4R:AddCallback(
     ModCallbacks.MC_POST_PICKUP_UPDATE,
     MSD4R.OnPostPickupUpdate,
     PickupVariant.PICKUP_COLLECTIBLE
+)
+
+MSD4R:AddCallback(
+    ModCallbacks.MC_POST_GET_COLLECTIBLE,
+    MSD4R.OnPostGetCollectible
 )
 
 MSD4R:AddCallback(

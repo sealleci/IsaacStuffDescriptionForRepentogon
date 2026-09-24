@@ -7,7 +7,8 @@ local DEFAULTS = {
     IconOutline = 1,     -- 1 = Off, 2 = Thin, 3 = Full
     OutlineColor = 2,    -- 1 = Black, 2 = White
     RunSeed = 0,
-    Seeds = {}
+    Seeds = {},
+    ExtraRNG = 0
 }
 
 function ModSave:CopyDefaults()
@@ -54,6 +55,13 @@ function ModSave:Normalize()
             or DEFAULTS.OutlineColor),
         1,
         2
+    )
+
+    self.Data.ExtraRNG = self:Clamp(
+        math.floor(tonumber(self.Data.ExtraRNG)
+            or DEFAULTS.ExtraRNG),
+        0,
+        500
     )
 end
 
@@ -180,6 +188,10 @@ end
 
 function ModSave:GetSeeds()
     return self.Data.Seeds
+end
+
+function ModSave:GetExtraRNG()
+    return self.Data.ExtraRNG
 end
 
 return ModSave

@@ -76,6 +76,30 @@ function ModConfig:RegisterAppearanceSettings()
         "Appearance",
         "Item icon appearance"
     )
+
+    ModConfigMenu.AddSetting(
+        MENU_INFO.CATEGORY,
+        "Appearance",
+        {
+            Type = ModConfigMenu.OptionType.NUMBER,
+            CurrentSetting = function()
+                return self.ModSave.Data.ExtraRNG
+            end,
+            Minimum = 0,
+            Maximum = 500,
+            Display = function()
+                return "Extra RNG: "
+                    .. tostring(self.ModSave.Data.ExtraRNG)
+            end,
+            OnChange = function(value)
+                self.ModSave:Set("ExtraRNG", ModConfig:Round(value))
+            end,
+            Info = {
+                "Tries different RNG counts."
+            }
+        }
+    )
+
     ModConfigMenu.AddSetting(
         MENU_INFO.CATEGORY,
         "Appearance",

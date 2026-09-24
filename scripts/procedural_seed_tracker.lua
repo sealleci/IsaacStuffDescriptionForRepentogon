@@ -17,6 +17,27 @@ function ProceduralSeedTracker:NormalizeSeed(seed)
     return Utility.ConvertToU32(seed)
 end
 
+function ProceduralSeedTracker:NormalizeItemID(rawItemID)
+    rawItemID = tonumber(rawItemID)
+    if not rawItemID then
+        return nil
+    end
+
+    rawItemID = math.floor(rawItemID)
+    if rawItemID < 0 then
+        return rawItemID
+    end
+
+    if rawItemID <= MAGIC_CONST.GLITCHED_ITEM_MASK
+        and (MAGIC_CONST.GLITCHED_ITEM_MASK - rawItemID)
+        <= MAGIC_CONST.PROCEDURAL_ITEM_SURFACE_COUNT
+    then
+        return rawItemID - MAGIC_CONST.GLITCHED_ITEM_MASK
+    end
+
+    return nil
+end
+
 function ProceduralSeedTracker:Initialize(mod)
     self.Mod = mod
     self.ModSave = mod.ModSave
@@ -29,12 +50,11 @@ function ProceduralSeedTracker:Initialize(mod)
     end
 
     for rawItemID, rawSeed in pairs(savedSeeds) do
-        local itemID = tonumber(rawItemID)
+        local itemID = self:NormalizeItemID(rawItemID)
         local seed = self:NormalizeSeed(rawSeed)
 
         if itemID
-            and itemID < 0
-            and seed
+            and seed ~= 0
         then
             self.ItemIDToSeed[itemID] = seed
         end
@@ -63,27 +83,20 @@ end
 
 function ProceduralSeedTracker:GetSeed(itemID)
     if itemID >= 0 then
-        return self.RunSeed
+        return nil
     end
 
-    local seed = self.ItemIDToSeed[itemID]
-
-    if not seed then
-        return self.RunSeed
-    end
-
-    return seed
+    return self.ItemIDToSeed[itemID]
 end
 
 function ProceduralSeedTracker:SetSeed(itemID, seed)
-    if itemID >= 0 then
+    itemID = self:NormalizeItemID(itemID)
+    if not itemID then
         return
     end
 
     seed = self:NormalizeSeed(seed)
-
-    if not seed
-        or seed == 0
+    if seed == 0
         or self.ItemIDToSeed[itemID] == seed
     then
         return
@@ -91,6 +104,12 @@ function ProceduralSeedTracker:SetSeed(itemID, seed)
 
     self.ItemIDToSeed[itemID] = seed
     self:Save()
+
+    Isaac.ConsoleOutput(string.format(
+        "[MSD4R]  glitched-item: %d, seed: %u\n",
+        itemID,
+        self:NormalizeSeed(seed)
+    ))
 end
 
 function ProceduralSeedTracker:Clear()
@@ -100,13 +119,15 @@ end
 function ProceduralSeedTracker:OnPostPickupUpdate(pickup)
     if not pickup
         or pickup.Variant ~= PickupVariant.PICKUP_COLLECTIBLE
-        or (MAGIC_CONST.GLITCHED_ITEM_MASK - pickup.SubType)
-        > 1024
     then
         return
     end
 
-    local itemID = pickup.SubType - MAGIC_CONST.GLITCHED_ITEM_MASK
+    local itemID = self:NormalizeItemID(pickup.SubType)
+    if not itemID then
+        return
+    end
+
     local seed = pickup.DropSeed
     if not seed then
         local rng = pickup:GetDropRNG()
@@ -116,12 +137,20 @@ function ProceduralSeedTracker:OnPostPickupUpdate(pickup)
     end
 
     self:SetSeed(itemID, seed)
+end
 
-    Isaac.ConsoleOutput(string.format(
-        "[MSD4R] pickup: %d, seed: %d\n",
-        itemID,
-        seed
-    ))
+function ProceduralSeedTracker:OnPostGetCollectible(
+    selectedCollectible,
+    itemPoolType,
+    decrease,
+    seed
+)
+    local itemID = self:NormalizeItemID(selectedCollectible)
+    if not itemID then
+        return
+    end
+
+    self:SetSeed(itemID, seed)
 end
 
 function ProceduralSeedTracker:OnPostGameStarted(isContinued)
