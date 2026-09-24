@@ -125,20 +125,7 @@ function ProceduralSeedTracker:OnPostPickupUpdate(pickup)
         return
     end
 
-    local itemID = self:NormalizeItemID(pickup.SubType)
-    if not itemID then
-        return
-    end
-
-    local seed = pickup.DropSeed
-    if not seed then
-        local rng = pickup:GetDropRNG()
-        if rng then
-            seed = rng:GetSeed()
-        end
-    end
-
-    self:SetSeed(itemID, seed)
+    self:SetSeed(pickup.SubType, pickup.DropSeed)
 end
 
 function ProceduralSeedTracker:OnPostGetCollectible(
@@ -147,12 +134,7 @@ function ProceduralSeedTracker:OnPostGetCollectible(
     decrease,
     seed
 )
-    local itemID = self:NormalizeItemID(selectedCollectible)
-    if not itemID then
-        return
-    end
-
-    self:SetSeed(itemID, seed)
+    self:SetSeed(selectedCollectible, seed)
 end
 
 function ProceduralSeedTracker:OnPostGameStarted(isContinued)
