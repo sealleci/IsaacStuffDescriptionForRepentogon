@@ -18,88 +18,12 @@ function ModConfig:Round(value)
     return math.floor(value + 0.5)
 end
 
-function ModConfig:RegisterLayoutSettings()
-    ModConfigMenu.AddTitle(
-        MENU_INFO.CATEGORY,
-        "Layout",
-        "My Stuff layout"
-    )
-    ModConfigMenu.AddSetting(
-        MENU_INFO.CATEGORY,
-        "Layout",
-        {
-            Type = ModConfigMenu.OptionType.NUMBER,
-            CurrentSetting = function()
-                return self.ModSave.Data.OffsetX
-            end,
-            Minimum = -200,
-            Maximum = 200,
-            Display = function()
-                return "Horizontal offset: "
-                    .. tostring(self.ModSave.Data.OffsetX)
-            end,
-            OnChange = function(value)
-                self.ModSave:Set("OffsetX", ModConfig:Round(value))
-            end,
-            Info = {
-                "Adjusts content horizontally in screen pixels."
-            }
-        }
-    )
-    ModConfigMenu.AddSetting(
-        MENU_INFO.CATEGORY,
-        "Layout",
-        {
-            Type = ModConfigMenu.OptionType.NUMBER,
-            CurrentSetting = function()
-                return self.ModSave.Data.OffsetY
-            end,
-            Minimum = -200,
-            Maximum = 200,
-            Display = function()
-                return "Vertical offset: "
-                    .. tostring(self.ModSave.Data.OffsetY)
-            end,
-            OnChange = function(value)
-                self.ModSave:Set("OffsetY", self:Round(value))
-            end,
-            Info = {
-                "Adjusts content vertically in screen pixels."
-            }
-        }
-    )
-end
-
 function ModConfig:RegisterAppearanceSettings()
     ModConfigMenu.AddTitle(
         MENU_INFO.CATEGORY,
         "Appearance",
         "Item icon appearance"
     )
-
-    ModConfigMenu.AddSetting(
-        MENU_INFO.CATEGORY,
-        "Appearance",
-        {
-            Type = ModConfigMenu.OptionType.NUMBER,
-            CurrentSetting = function()
-                return self.ModSave.Data.ExtraRNG
-            end,
-            Minimum = 0,
-            Maximum = 500,
-            Display = function()
-                return "Extra RNG: "
-                    .. tostring(self.ModSave.Data.ExtraRNG)
-            end,
-            OnChange = function(value)
-                self.ModSave:Set("ExtraRNG", ModConfig:Round(value))
-            end,
-            Info = {
-                "Tries different RNG counts."
-            }
-        }
-    )
-
     ModConfigMenu.AddSetting(
         MENU_INFO.CATEGORY,
         "Appearance",
@@ -171,12 +95,65 @@ function ModConfig:RegisterAppearanceSettings()
     )
 end
 
+function ModConfig:RegisterLayoutSettings()
+    ModConfigMenu.AddTitle(
+        MENU_INFO.CATEGORY,
+        "Layout",
+        "My Stuff layout"
+    )
+    ModConfigMenu.AddSetting(
+        MENU_INFO.CATEGORY,
+        "Layout",
+        {
+            Type = ModConfigMenu.OptionType.NUMBER,
+            CurrentSetting = function()
+                return self.ModSave.Data.OffsetX
+            end,
+            Minimum = -200,
+            Maximum = 200,
+            Display = function()
+                return "Horizontal offset: "
+                    .. tostring(self.ModSave.Data.OffsetX)
+            end,
+            OnChange = function(value)
+                self.ModSave:Set("OffsetX", ModConfig:Round(value))
+            end,
+            Info = {
+                "Adjusts content horizontally in screen pixels."
+            }
+        }
+    )
+    ModConfigMenu.AddSetting(
+        MENU_INFO.CATEGORY,
+        "Layout",
+        {
+            Type = ModConfigMenu.OptionType.NUMBER,
+            CurrentSetting = function()
+                return self.ModSave.Data.OffsetY
+            end,
+            Minimum = -200,
+            Maximum = 200,
+            Display = function()
+                return "Vertical offset: "
+                    .. tostring(self.ModSave.Data.OffsetY)
+            end,
+            OnChange = function(value)
+                self.ModSave:Set("OffsetY", self:Round(value))
+            end,
+            Info = {
+                "Adjusts content vertically in screen pixels."
+            }
+        }
+    )
+end
+
 function ModConfig:Initialize(modSave)
     if ModConfigMenu == nil then
         return
     end
 
     self.ModSave = modSave
+
     self:RegisterAppearanceSettings()
     self:RegisterLayoutSettings()
 end

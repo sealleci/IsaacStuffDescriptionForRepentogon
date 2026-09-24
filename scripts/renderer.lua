@@ -120,7 +120,7 @@ function Renderer:Initialize(mod)
     )
     self.AvatarSprite:Play("Main", true)
 
-    GlitchedItemRenderer:Initialize(mod.ModSave)
+    GlitchedItemRenderer:Initialize()
 end
 
 function Renderer:MultiplyVector(left, right)

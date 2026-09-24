@@ -44,7 +44,7 @@ function ProceduralSeedTracker:Initialize(mod)
     self.ItemIDToSeed = {}
     self.RunSeed = self:NormalizeSeed(self.ModSave:GetRunSeed())
 
-    local savedSeeds = self.ModSave:GetSeeds()
+    local savedSeeds = self.ModSave:GetProceduralSeeds()
     if type(savedSeeds) ~= "table" then
         return
     end
@@ -78,7 +78,7 @@ function ProceduralSeedTracker:Save()
     end
 
     self.ModSave:Set("RunSeed", self.RunSeed)
-    self.ModSave:Set("Seeds", seeds)
+    self.ModSave:Set("ProceduralSeeds", seeds)
 end
 
 function ProceduralSeedTracker:GetSeed(itemID)
@@ -106,7 +106,9 @@ function ProceduralSeedTracker:SetSeed(itemID, seed)
     self:Save()
 
     Isaac.ConsoleOutput(string.format(
-        "[MSD4R]  glitched-item: %d, seed: %u\n",
+        "[MSD4R] Glitched item info:\n"
+        .. "        id: %d\n"
+        .. "        seed: %u\n",
         itemID,
         self:NormalizeSeed(seed)
     ))

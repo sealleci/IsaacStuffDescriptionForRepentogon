@@ -38,7 +38,7 @@ local CONFIG = {
     }
 }
 
-function GlitchedItemRenderer:Initialize(modSave)
+function GlitchedItemRenderer:Initialize()
     if self.Initialized then
         return
     end
@@ -79,7 +79,6 @@ function GlitchedItemRenderer:Initialize(modSave)
     self.AtlasHeight = image:GetHeight()
     self.AtlasColumnCount = math.floor(self.AtlasWidth / CONFIG.ICON_SIZE)
     self.AtlasRowCount = math.floor(self.AtlasHeight / CONFIG.ICON_SIZE)
-    self.ModSave = modSave
     self.Initialized = true
 end
 
@@ -1096,11 +1095,6 @@ function GlitchedItemRenderer:RenderItemIcon(
     )
     if not graphicsState then
         return false
-    end
-
-    local extraRNG = self.ModSave:GetExtraRNG()
-    if extraRNG > 0 then
-        graphicsState = self:AdvanceRNG(graphicsState, extraRNG)
     end
 
     local recipe, nextState = self:GenerateRecipe(graphicsState)
