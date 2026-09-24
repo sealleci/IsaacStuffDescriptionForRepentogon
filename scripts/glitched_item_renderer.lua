@@ -82,10 +82,6 @@ function GlitchedItemRenderer:Initialize()
     self.Initialized = true
 end
 
-function GlitchedItemRenderer:GetRandomFloat(state)
-    return Utility.ConvertToU32(state) / 0x100000000
-end
-
 function GlitchedItemRenderer:GetNextRNG(state)
     state = Utility.ConvertToU32(state)
     state = Utility.ConvertToU32(state ~ (state >> 4))
@@ -93,6 +89,12 @@ function GlitchedItemRenderer:GetNextRNG(state)
     state = Utility.ConvertToU32(state ~ (state >> 27))
 
     return state
+end
+
+function GlitchedItemRenderer:GetRandomFloat(state)
+    state = self:GetNextRNG(state)
+
+    return state, state / 0x100000000
 end
 
 function GlitchedItemRenderer:AdvanceRNG(state, count)
@@ -129,7 +131,7 @@ end
 function GlitchedItemRenderer:GetEffectRandomFloat(state)
     state = self:GetEffectNextRNG(state)
 
-    return state, Utility.ConvertToU32(state) / 0x100000000
+    return state, state / 0x100000000
 end
 
 function GlitchedItemRenderer:AdjustItemID(itemID)
@@ -148,7 +150,7 @@ function GlitchedItemRenderer:AdjustItemID(itemID)
     return adjustedItemID
 end
 
-function GlitchedItemRenderer:GetProceduralItem(itemID)
+function GlitchedItemRenderer:GetRawProceduralItem(itemID)
     if not itemID
         or itemID >= 0
         or not ProceduralItemManager
@@ -158,7 +160,7 @@ function GlitchedItemRenderer:GetProceduralItem(itemID)
         return nil
     end
 
-    local index = -itemID - 1
+    local index = math.abs(itemID) - 1
     if index < 0 then
         return nil
     end
@@ -180,14 +182,14 @@ function GlitchedItemRenderer:GetProceduralItem(itemID)
     return proceduralItem
 end
 
-function GlitchedItemRenderer:GetProceduralSnapshot(itemID)
-    local proceduralItem = self:GetProceduralItem(itemID)
+function GlitchedItemRenderer:GetGlitchedItemSnapshot(itemID)
+    local proceduralItem = self:GetRawProceduralItem(itemID)
     if not proceduralItem then
         return nil
     end
 
     local snapshot = {
-        ProceduralItem = proceduralItem,
+        ItemID = itemID,
         Effects = {},
         NonZeroStatCount = 0,
         ItemType = 0,
@@ -278,7 +280,7 @@ end
 
 function GlitchedItemRenderer:ReplayGlitchedTextPhase(state)
     for _ = 1, 2 do
-        -- Three rolls determine the target string length.
+        -- 3 rolls determine the target string length.
         state = self:AdvanceRNG(state, 3)
 
         -- One roll with 1/80 chance to extend the generated string.
@@ -349,8 +351,8 @@ function GlitchedItemRenderer:ReplayPreEffectPhase(
             state = self:AdvanceRNG(state, 12)
         else
             -- First selected stat is always written.
-            state = self:GetNextRNG(state)
-            local firstRoll = self:GetRandomFloat(state)
+            local firstRoll
+            state, firstRoll = self:GetRandomFloat(state)
 
             -- The second stat has a 2-stage branch.
             if firstRoll < 0.25 then
@@ -379,12 +381,9 @@ function GlitchedItemRenderer:ReplayPreEffectPhase(
         local value2
         local value3
 
-        state = self:GetNextRNG(state)
-        value1 = self:GetRandomFloat(state)
-        state = self:GetNextRNG(state)
-        value2 = self:GetRandomFloat(state)
-        state = self:GetNextRNG(state)
-        value3 = self:GetRandomFloat(state)
+        state, value1 = self:GetRandomFloat(state)
+        state, value2 = self:GetRandomFloat(state)
+        state, value3 = self:GetRandomFloat(state)
 
         effectBudget = value1 + value2 + value3
     else
@@ -392,14 +391,16 @@ function GlitchedItemRenderer:ReplayPreEffectPhase(
         local budgetBase = CONFIG.C000_EFFECT_BUDGET_VALUES[state & 0xF] or 0
 
         if budgetBase < 13 then
-            state = self:GetNextRNG(state)
-            local value = self:GetRandomFloat(state) * budgetBase
-            effectBudget = value + value + 1
+            local value4
+            state, value4 = self:GetRandomFloat(state)
+
+            effectBudget = value4 * budgetBase * 2 + 1
         else
-            state = self:GetNextRNG(state)
-            local value4 = self:GetRandomFloat(state)
-            state = self:GetNextRNG(state)
-            local value5 = self:GetRandomFloat(state)
+            local value4
+            local value5
+
+            state, value4 = self:GetRandomFloat(state)
+            state, value5 = self:GetRandomFloat(state)
 
             effectBudget = value4 + value5
         end
@@ -640,7 +641,8 @@ function GlitchedItemRenderer:ReplayEffects(
         state,
         score
     )
-        target[#target + 1] = {
+        local nextIndex = #target + 1
+        target[nextIndex] = {
             State = state,
             Attempt = node.Attempt + 1,
             EffectIndex = node.EffectIndex + 1,
@@ -655,7 +657,8 @@ function GlitchedItemRenderer:ReplayEffects(
         node,
         state
     )
-        target[#target + 1] = {
+        local nextIndex = #target + 1
+        target[nextIndex] = {
             State = state,
             Attempt = node.Attempt + 1,
             EffectIndex = node.EffectIndex,
@@ -690,7 +693,6 @@ function GlitchedItemRenderer:ReplayEffects(
         end
 
         local nextNodes = {}
-        local nextNodeIndex = 1
 
         for _, node in ipairs(nodes) do
             local allObservedEffectsAccepted = node.EffectIndex > effectCount
@@ -735,7 +737,7 @@ function GlitchedItemRenderer:ReplayEffects(
                         Over-budget candidates consume one forced-accept roll,
                         where candidate is accepted with 1/20 chance.
                         ]]
-                        local rollState = self:GetNextProceduralRNG(candidate.State)
+                        local rollState = self:GetNextRNG(candidate.State)
                         if rollState % 20 == 0 then
                             appendAcceptedNode(
                                 nextNodes,
@@ -850,15 +852,14 @@ function GlitchedItemRenderer:GetGraphicsState(
         return nil
     end
 
-    local snapshot = self:GetProceduralSnapshot(itemID)
-    local state = self:ReplayGlitchedTextPhase(
-        Utility.ConvertToU32(proceduralSeed)
-    )
-
+    local snapshot = self:GetGlitchedItemSnapshot(itemID)
     if not snapshot then
         return Utility.ConvertToU32(proceduralSeed)
     end
 
+    local state = self:ReplayGlitchedTextPhase(
+        Utility.ConvertToU32(proceduralSeed)
+    )
     local beforeEffectsState, effectBudget = self:ReplayPreEffectPhase(
         state,
         proceduralSeed,
@@ -870,7 +871,6 @@ function GlitchedItemRenderer:GetGraphicsState(
         effectBudget,
         snapshot
     )
-
     if not effectEndState then
         effectEndState = self:ProcessFallbackEffects(
             beforeEffectsState,
@@ -914,13 +914,13 @@ function GlitchedItemRenderer:GenerateSourceItemIDs(state)
         nil
     }
 
-    for sourceImageIndex = 1, 4 do
+    for sourceItemIndex = 1, 4 do
         for _ = 1, CONFIG.MAX_SOURCE_ITEM_RETRIES do
             local itemID
             itemID, state = self:GetRandomSourceItemID(state)
 
             if itemID then
-                sourceItemIDs[sourceImageIndex] = itemID
+                sourceItemIDs[sourceItemIndex] = itemID
                 break
             end
         end
@@ -1076,7 +1076,8 @@ function GlitchedItemRenderer:RenderItemIconTile(
     self.ItemIconsImage:Render(
         sourceQuad,
         destinationQuad,
-        Utility.ConvertToKColor(color)
+        KColor(1, 1, 1, 1),
+        color
     )
 
     return true
