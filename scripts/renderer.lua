@@ -103,6 +103,10 @@ function Renderer:Initialize(mod)
     self.PauseMenuSpritesheetReplaced = false
     self.ReplacedPauseMenuLayerName = nil
     self.OriginalPauseMenuSpritesheet = nil
+    self.ModTrinketSprites = {}
+    self.GlitchedItemRenderer = GlitchedItemRenderer
+
+    self.GlitchedItemRenderer:Initialize()
 
     self.TrinketSprite = Sprite()
     self.TrinketSprite:Load(
@@ -111,16 +115,12 @@ function Renderer:Initialize(mod)
     )
     self.TrinketSprite:Play("Diary", true)
 
-    self.ModTrinketSprites = {}
-
     self.AvatarSprite = Sprite()
     self.AvatarSprite:Load(
         "gfx/ui/coop menu_msd4r.anm2",
         true
     )
     self.AvatarSprite:Play("Main", true)
-
-    GlitchedItemRenderer:Initialize()
 end
 
 function Renderer:MultiplyVector(left, right)
@@ -137,7 +137,6 @@ function Renderer:NormalizeFrameScale(scale)
     either as 100-based or 1-based render multipliers.
     Accept both forms to keep compatibility.
     ]]
-
     local x = math.abs(scale.X)
     local y = math.abs(scale.Y)
 
