@@ -1,7 +1,29 @@
+---@class MSD4RPauseMenuController
+---@field Mod MSD4RMod
+---@field Renderer MSD4RRenderer
+---@field ProceduralSeedTracker MSD4RProceduralSeedTracker
+---@field PlayerIndex integer
+---@field PlayerInputIndex integer
+---@field AllPlayersItemSlots table<integer, MSD4RItemSlot[]>
+---@field InspectMode boolean
+---@field PauseSessionActive boolean
+---@field SelectedItemSlotIndex integer
+---@field FirstColumnNumber integer
+---@field SavedPauseMenuSelection integer
+---@field LastRenderError string?
 local PauseMenuController = {}
+---@type MSD4RUtility
+local Utility = include("scripts/utility")
+
+---@type Game
 local game = Game()
+---@type MSD4RUIConfig
 local UI_CONFIG = include("scripts/ui_config")
 
+---@param mod MSD4RMod
+---@param renderer MSD4RRenderer
+---@param proceduralSeedTracker MSD4RProceduralSeedTracker
+---@return nil # No return value.
 function PauseMenuController:Initialize(mod, renderer, proceduralSeedTracker)
     self.Mod = mod
     self.Renderer = renderer
@@ -16,6 +38,7 @@ function PauseMenuController:Initialize(mod, renderer, proceduralSeedTracker)
     self.SavedPauseMenuSelection = 0
 end
 
+---@return nil # No return value.
 function PauseMenuController:ClampSelectedIndex()
     self.SelectedItemSlotIndex = math.max(
         1,
@@ -26,6 +49,7 @@ function PauseMenuController:ClampSelectedIndex()
     )
 end
 
+---@return nil # No return value.
 function PauseMenuController:ClampFirstColumnNumber()
     self.FirstColumnNumber = math.max(
         1,
@@ -36,6 +60,7 @@ function PauseMenuController:ClampFirstColumnNumber()
     )
 end
 
+---@return integer result1
 function PauseMenuController:GetPlayerType()
     local player = Isaac.GetPlayer(self.PlayerIndex)
 
@@ -46,6 +71,7 @@ function PauseMenuController:GetPlayerType()
     return player:GetPlayerType()
 end
 
+---@return integer result1
 function PauseMenuController:GetControllerIndex()
     local player = Isaac.GetPlayer(self.PlayerInputIndex)
 
@@ -56,6 +82,7 @@ function PauseMenuController:GetControllerIndex()
     return player.ControllerIndex
 end
 
+---@return MSD4RItemSlot? result1
 function PauseMenuController:GetSelectedItemSlot()
     local itemSlots = self.AllPlayersItemSlots[self.PlayerIndex]
 
@@ -66,6 +93,8 @@ function PauseMenuController:GetSelectedItemSlot()
     end
 end
 
+---@param playerIndex integer
+---@return MSD4RItemSlot[] result1
 function PauseMenuController:GetSinglePlayerItemSlots(playerIndex)
     local itemSlots = {}
     local itemIndex = 1
@@ -113,6 +142,7 @@ function PauseMenuController:GetSinglePlayerItemSlots(playerIndex)
     return itemSlots
 end
 
+---@return MSD4RPlayerSlots result1
 function PauseMenuController:GetAllPlayersItemSlots()
     local allPlayersItemSlots = {}
 
@@ -123,10 +153,12 @@ function PauseMenuController:GetAllPlayersItemSlots()
     return allPlayersItemSlots
 end
 
+---@return MSD4RItemSlot[] result1
 function PauseMenuController:GetCurPlayerItemSlots()
     return self.AllPlayersItemSlots[self.PlayerIndex] or {}
 end
 
+---@return integer result1
 function PauseMenuController:GetPlayerCountWithItems()
     local count = 0
 
@@ -139,6 +171,7 @@ function PauseMenuController:GetPlayerCountWithItems()
     return count
 end
 
+---@return nil # No return value.
 function PauseMenuController:RefreshItemSlots()
     self.AllPlayersItemSlots = self:GetAllPlayersItemSlots()
 
@@ -152,6 +185,7 @@ function PauseMenuController:RefreshItemSlots()
     self:ClampFirstColumnNumber()
 end
 
+---@return nil # No return value.
 function PauseMenuController:PickPlayerWithItems()
     if #(self.AllPlayersItemSlots[self.PlayerIndex] or {}) < 1 then
         local availablePlayerIndices = {}
@@ -174,6 +208,7 @@ function PauseMenuController:PickPlayerWithItems()
     end
 end
 
+---@return nil # No return value.
 function PauseMenuController:EnterInspectMode()
     self:RefreshItemSlots()
     self:PickPlayerWithItems()
@@ -186,6 +221,7 @@ function PauseMenuController:EnterInspectMode()
     self.InspectMode = true
 end
 
+---@return nil # No return value.
 function PauseMenuController:ExitInspectMode()
     self.InspectMode = false
     self.Renderer:RestorePauseMenuSpritesheet()
@@ -198,6 +234,8 @@ function PauseMenuController:ExitInspectMode()
     end
 end
 
+---@param offset integer
+---@return nil # No return value.
 function PauseMenuController:SwitchPlayerItemsDisplay(offset)
     local direction = offset > 0 and 1 or -1
     local availableIndices = {}
@@ -267,6 +305,9 @@ function PauseMenuController:SwitchPlayerItemsDisplay(offset)
     end
 end
 
+---@param offset integer
+---@param horizontal boolean
+---@return nil # No return value.
 function PauseMenuController:MoveCursor(offset, horizontal)
     local itemSlotsLength = #(self.AllPlayersItemSlots[self.PlayerIndex] or {})
     if itemSlotsLength < 1 then
@@ -330,6 +371,7 @@ function PauseMenuController:MoveCursor(offset, horizontal)
     end
 end
 
+---@return nil # No return value.
 function PauseMenuController:HandlePauseMenuInput()
     local controller = self:GetControllerIndex()
 
@@ -376,6 +418,9 @@ function PauseMenuController:HandlePauseMenuInput()
     end
 end
 
+---@param pauseBody? Sprite
+---@param pauseStats? Sprite
+---@return nil # No return value.
 function PauseMenuController:OnPrePauseScreenRender(
     pauseBody,
     pauseStats
@@ -396,57 +441,77 @@ function PauseMenuController:OnPrePauseScreenRender(
     self.Renderer:HidePartialPauseMenu(pauseBody, pauseStats)
 end
 
+---@param pauseBody? Sprite
+---@param pauseStats? Sprite
+---@return nil # No return value.
 function PauseMenuController:OnPostPauseScreenRender(
     pauseBody,
     pauseStats
 )
-    if not game:IsPauseMenuOpen()
-        or PauseMenu.GetState() == PauseMenuStates.OPTIONS
-        or not pauseBody
-    then
-        return
-    end
+    local renderedSuccessfully, failureReason = pcall(
+    ---@return nil # No return value.
+        function()
+            if not game:IsPauseMenuOpen()
+                or PauseMenu.GetState() == PauseMenuStates.OPTIONS
+                or not pauseBody
+            then
+                return
+            end
 
-    local animation = pauseBody:GetAnimation()
+            local animation = pauseBody:GetAnimation()
 
-    if animation == "Appear"
-        or animation == "Dissapear"
-    then
-        self.Renderer:RenderEmptyMyStuffPage(pauseBody)
-        return
-    end
+            if animation == "Appear"
+                or animation == "Dissapear"
+            then
+                self.Renderer:RenderEmptyMyStuffPage(pauseBody)
+                return
+            end
 
-    if not self.PauseSessionActive then
-        self.PauseSessionActive = true
-        self:RefreshItemSlots()
-        self:PickPlayerWithItems()
-    end
+            if not self.PauseSessionActive then
+                self.PauseSessionActive = true
+                self:RefreshItemSlots()
+                self:PickPlayerWithItems()
+            end
 
-    self:HandlePauseMenuInput()
-    self.Renderer:RenderMyStuffPage(
-        pauseBody,
-        self:GetPlayerType(),
-        self:GetCurPlayerItemSlots(),
-        self.FirstColumnNumber,
-        self:GetPlayerCountWithItems()
+            self:HandlePauseMenuInput()
+            self.Renderer:RenderMyStuffPage(
+                pauseBody,
+                self:GetPlayerType(),
+                self:GetCurPlayerItemSlots(),
+                self.FirstColumnNumber,
+                self:GetPlayerCountWithItems()
+            )
+
+            if self.InspectMode then
+                local selectedItemSlot = self:GetSelectedItemSlot()
+
+                if selectedItemSlot then
+                    self.Renderer:RenderInspect(
+                        pauseBody,
+                        selectedItemSlot,
+                        self.SelectedItemSlotIndex,
+                        self.FirstColumnNumber
+                    )
+                end
+
+                PauseMenu.SetSelectedElement(self.SavedPauseMenuSelection)
+            end
+        end
     )
 
-    if self.InspectMode then
-        local selectedItemSlot = self:GetSelectedItemSlot()
+    if not renderedSuccessfully then
+        local errorMessage = tostring(failureReason)
 
-        if selectedItemSlot then
-            self.Renderer:RenderInspect(
-                pauseBody,
-                selectedItemSlot,
-                self.SelectedItemSlotIndex,
-                self.FirstColumnNumber
-            )
+        if self.LastRenderError ~= errorMessage then
+            Utility.Log("Failed to render pause screen: " .. errorMessage .. ".")
+            self.LastRenderError = errorMessage
         end
-
-        PauseMenu.SetSelectedElement(self.SavedPauseMenuSelection)
+    else
+        self.LastRenderError = nil
     end
 end
 
+---@return nil # No return value.
 function PauseMenuController:OnPostRender()
     if game:IsPauseMenuOpen() then
         return
@@ -459,18 +524,5 @@ function PauseMenuController:OnPostRender()
     self.PauseSessionActive = false
 end
 
-function PauseMenuController:OnExecuteCommand(command, params)
-    if command ~= "msd4r_dump" then
-        return
-    end
-
-    if not game:IsPauseMenuOpen() then
-        Isaac.ConsoleOutput("[MSD4R] Open the pause menu first.\n")
-
-        return
-    end
-
-    self.Renderer:DumpRenderInfo()
-end
-
+---@type MSD4RPauseMenuController
 return PauseMenuController

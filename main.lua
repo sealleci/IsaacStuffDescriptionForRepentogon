@@ -1,60 +1,138 @@
+---@type MSD4RUtility
+local Utility = include("scripts/utility")
+
+---@class MSD4RMod: ModReference
+---@field Enabled boolean
+---@field GlitchedRenderingAvailable boolean
+---@field EID MSD4REID
+---@field ModSave MSD4RModSave
 local MSD4R = RegisterMod("My Stuff Descriptions for Repentogon", 1)
 
+---@type MSD4RCoreAPI
+local CoreAPI = include("scripts/core_api")
+---@type MSD4RModSave
 local ModSave = include("scripts/mod_save")
+---@type MSD4RPauseMenuController
 local PauseMenuController = include("scripts/pause_menu_controller")
+---@type MSD4RProceduralSeedTracker
 local ProceduralSeedTracker = include("scripts/procedural_seed_tracker")
+---@type MSD4RRenderer
 local Renderer = include("scripts/renderer")
 
+---@type string
 local EID_MOD_ID = "836319872"
+---@type MSD4RModConfig
 local ModConfig = include("scripts/mod_config")
+---@type Game
 local game = Game()
 
-function MSD4R:OnModsLoaded()
-    if not PauseMenu
-        or not XMLData
-        or not Isaac.RenderCollectionItem
-        or not ModCallbacks.MC_PRE_PAUSE_SCREEN_RENDER
-        or not ModCallbacks.MC_POST_PAUSE_SCREEN_RENDER
-    then
+MSD4R.Enabled = false
+MSD4R.GlitchedRenderingAvailable = false
+
+---@param callbackID? integer
+---@param callback function
+---@param filter? integer
+---@return nil # No return value.
+function MSD4R:RegisterAvailableCallback(
+    callbackID,
+    callback,
+    filter
+)
+    if type(callbackID) ~= "number" then
+        return
+    end
+
+    self:AddCallback(callbackID, callback, filter)
+end
+
+---@param pauseBody? Sprite
+---@param pauseStats? Sprite
+---@return boolean result1
+function MSD4R:CheckRuntimeAPIs(pauseBody, pauseStats)
+    local coreAvailable, missingAPIs = CoreAPI:CheckCoreRuntime(
+        game,
+        pauseBody,
+        pauseStats
+    )
+
+    if not coreAvailable then
         self.Enabled = false
-        Isaac.ConsoleOutput("[MSD4R] REPENTOGON API is unavailable.\n")
+        CoreAPI:ReportUnavailable("Core", missingAPIs)
+    end
+
+    return coreAvailable
+end
+
+---@return nil # No return value.
+function MSD4R:OnModsLoaded()
+    self.Enabled = false
+    self.GlitchedRenderingAvailable = false
+
+    CoreAPI:Initialize()
+
+    local coreAvailable, missingAPIs = CoreAPI:CheckCore(
+        self,
+        game,
+        EID
+    )
+
+    if not coreAvailable then
+        CoreAPI:ReportUnavailable("Core", missingAPIs)
 
         return
     end
 
     local eidMetadata = XMLData.GetModById(EID_MOD_ID)
+
     if not eidMetadata
         or not EID
     then
         self.Enabled = false
-        Isaac.ConsoleOutput("[MSD4R] EID API is unavailable.\n")
+        Utility.Log("EID API is unavailable.")
 
         return
     end
 
     self.EID = EID
-    self.Enabled = true
     self.ModSave = ModSave
 
     ModSave:Initialize(self)
     ModConfig:Initialize(ModSave)
     Renderer:Initialize(self)
-    ProceduralSeedTracker:Initialize(self)
-    PauseMenuController:Initialize(self, Renderer, ProceduralSeedTracker)
+    self.GlitchedRenderingAvailable =
+        Renderer.GlitchedItemRenderer.Initialized == true
 
-    Isaac.ConsoleOutput("[MSD4R] Initialized successfully.\n")
+    if self.GlitchedRenderingAvailable then
+        ProceduralSeedTracker:Initialize(self)
+    else
+        ProceduralSeedTracker:Clear()
+    end
+
+    PauseMenuController:Initialize(
+        self,
+        Renderer,
+        ProceduralSeedTracker
+    )
+
+    self.Enabled = true
+    Utility.Log("Initialized successfully.")
 end
 
-MSD4R:AddCallback(
+MSD4R:RegisterAvailableCallback(
     ModCallbacks.MC_POST_MODS_LOADED,
     MSD4R.OnModsLoaded
 )
 
+---@param pauseBody? Sprite
+---@param pauseStats? Sprite
+---@return nil # No return value.
 function MSD4R:OnPrePauseScreenRender(
     pauseBody,
     pauseStats
 )
-    if not self.Enabled then
+    if not self.Enabled
+        or not self:CheckRuntimeAPIs(pauseBody, pauseStats)
+    then
         return
     end
 
@@ -64,16 +142,21 @@ function MSD4R:OnPrePauseScreenRender(
     )
 end
 
-MSD4R:AddCallback(
+MSD4R:RegisterAvailableCallback(
     ModCallbacks.MC_PRE_PAUSE_SCREEN_RENDER,
     MSD4R.OnPrePauseScreenRender
 )
 
+---@param pauseBody? Sprite
+---@param pauseStats? Sprite
+---@return nil # No return value.
 function MSD4R:OnPostPauseScreenRender(
     pauseBody,
     pauseStats
 )
-    if not self.Enabled then
+    if not self.Enabled or
+        not self:CheckRuntimeAPIs(pauseBody, pauseStats)
+    then
         return
     end
 
@@ -83,11 +166,12 @@ function MSD4R:OnPostPauseScreenRender(
     )
 end
 
-MSD4R:AddCallback(
+MSD4R:RegisterAvailableCallback(
     ModCallbacks.MC_POST_PAUSE_SCREEN_RENDER,
     MSD4R.OnPostPauseScreenRender
 )
 
+---@return nil # No return value.
 function MSD4R:OnPostRender()
     if not self.Enabled then
         return
@@ -96,11 +180,17 @@ function MSD4R:OnPostRender()
     PauseMenuController:OnPostRender()
 end
 
-MSD4R:AddCallback(
+MSD4R:RegisterAvailableCallback(
     ModCallbacks.MC_POST_RENDER,
     MSD4R.OnPostRender
 )
 
+---@param slot integer
+---@param position Vector
+---@param scale Vector
+---@param player EntityPlayer
+---@param cropOffset Vector
+---@return boolean result1
 function MSD4R:OnPrePlayerHUDTrinketRender(
     slot,
     position,
@@ -112,53 +202,70 @@ function MSD4R:OnPrePlayerHUDTrinketRender(
     Smelted trinkets are rendered in My Stuff page through this function.
     Returns true to cancel rendering.
     ]]
-    if not game:IsPauseMenuOpen() then
+    if not self.Enabled or
+        not game:IsPauseMenuOpen()
+    then
         return false
     end
 
     return true
 end
 
-MSD4R:AddCallback(
+MSD4R:RegisterAvailableCallback(
     ModCallbacks.MC_PRE_PLAYERHUD_TRINKET_RENDER,
     MSD4R.OnPrePlayerHUDTrinketRender
 )
 
+---@param pickup EntityPickup
+---@return nil # No return value.
 function MSD4R:OnPostPickupInit(pickup)
-    if not self.Enabled then
+    if not self.Enabled or
+        not self.GlitchedRenderingAvailable
+    then
         return
     end
 
     ProceduralSeedTracker:OnPostPickupUpdate(pickup, 'init')
 end
 
-MSD4R:AddCallback(
+MSD4R:RegisterAvailableCallback(
     ModCallbacks.MC_POST_PICKUP_INIT,
     MSD4R.OnPostPickupInit,
     PickupVariant.PICKUP_COLLECTIBLE
 )
 
+---@param pickup EntityPickup
+---@return nil # No return value.
 function MSD4R:OnPostPickupUpdate(pickup)
-    if not self.Enabled then
+    if not self.Enabled or
+        not self.GlitchedRenderingAvailable
+    then
         return
     end
 
     ProceduralSeedTracker:OnPostPickupUpdate(pickup)
 end
 
-MSD4R:AddCallback(
+MSD4R:RegisterAvailableCallback(
     ModCallbacks.MC_POST_PICKUP_UPDATE,
     MSD4R.OnPostPickupUpdate,
     PickupVariant.PICKUP_COLLECTIBLE
 )
 
+---@param selected integer
+---@param pool integer
+---@param decrease boolean
+---@param seed integer
+---@return nil # No return value.
 function MSD4R:OnPostGetCollectible(
     selected,
     pool,
     decrease,
     seed
 )
-    if not self.Enabled then
+    if not self.Enabled or
+        not self.GlitchedRenderingAvailable
+    then
         return
     end
 
@@ -170,41 +277,56 @@ function MSD4R:OnPostGetCollectible(
     )
 end
 
-MSD4R:AddCallback(
+MSD4R:RegisterAvailableCallback(
     ModCallbacks.MC_POST_GET_COLLECTIBLE,
     MSD4R.OnPostGetCollectible
 )
 
+---@param item integer
+---@param rng RNG
+---@param player EntityPlayer
+---@return nil # No return value.
 function MSD4R:OnPreUseItem(item, rng, player)
-    if not self.Enabled then
+    if not self.Enabled or
+        not self.GlitchedRenderingAvailable
+    then
         return
     end
 
     ProceduralSeedTracker:OnPreUseD4(rng, player)
 end
 
-MSD4R:AddCallback(
+MSD4R:RegisterAvailableCallback(
     ModCallbacks.MC_PRE_USE_ITEM,
     MSD4R.OnPreUseItem,
     CollectibleType.COLLECTIBLE_D4
 )
 
+---@param item integer
+---@param rng RNG
+---@param player EntityPlayer
+---@return nil # No return value.
 function MSD4R:OnPostUseItem(item, rng, player)
-    if not self.Enabled then
+    if not self.Enabled or
+        not self.GlitchedRenderingAvailable
+    then
         return
     end
 
     ProceduralSeedTracker:OnPostUseD4(rng, player)
 end
 
-MSD4R:AddCallback(
+MSD4R:RegisterAvailableCallback(
     ModCallbacks.MC_POST_USE_ITEM,
     MSD4R.OnPostUseItem,
     CollectibleType.COLLECTIBLE_D4
 )
 
+---@return nil # No return value.
 function MSD4R:OnPostUpdate()
-    if not self.Enabled then
+    if not self.Enabled or
+        not self.GlitchedRenderingAvailable
+    then
         return
     end
 
@@ -212,14 +334,18 @@ function MSD4R:OnPostUpdate()
 end
 
 if not ModCallbacks.MC_POST_USE_ITEM then
-    MSD4R:AddCallback(
+    MSD4R:RegisterAvailableCallback(
         ModCallbacks.MC_POST_UPDATE,
         MSD4R.OnPostUpdate
     )
 end
 
+---@param isContinued boolean
+---@return nil # No return value.
 function MSD4R:OnPostGameStarted(isContinued)
-    if not self.Enabled then
+    if not self.Enabled or
+        not self.GlitchedRenderingAvailable
+    then
         return
     end
 
@@ -227,85 +353,86 @@ function MSD4R:OnPostGameStarted(isContinued)
     Renderer.GlitchedItemRenderer:Reset()
 end
 
-MSD4R:AddCallback(
+MSD4R:RegisterAvailableCallback(
     ModCallbacks.MC_POST_GAME_STARTED,
     MSD4R.OnPostGameStarted
 )
 
+---@return nil # No return value.
 function MSD4R:OnPreGameExit()
-    if not self.Enabled then
+    if not self.Enabled or
+        not self.GlitchedRenderingAvailable
+    then
         return
     end
 
     ProceduralSeedTracker:OnPreGameExit()
 end
 
-MSD4R:AddCallback(
+MSD4R:RegisterAvailableCallback(
     ModCallbacks.MC_PRE_GAME_EXIT,
     MSD4R.OnPreGameExit
 )
 
+---@param command string
+---@param params string
+---@return nil # No return value.
 function MSD4R:OnExecuteCommand(command, params)
-    if not self.Enabled then
+    if not self.Enabled or
+        not self.GlitchedRenderingAvailable
+    then
         return
     end
 
-    local function diagnostic(id, seeds, flags, kind)
-        local r = Renderer.GlitchedItemRenderer
-        r:Reset()
-        local context = {
-            Kind = kind,
-            RunSeed = ProceduralSeedTracker:GetCurrentRunSeed(),
-            SeedSources = ProceduralSeedTracker.SoSeedSourcesurces
-                and ProceduralSeedTracker.SeedSources[id]
-                or {}
-        }
+    if command == "msd4r_tm" then
+        local itemID = params:match("^%s*(-?%d+)%s*$")
+        itemID = tonumber(itemID)
 
-        Isaac.ConsoleOutput(r:Describe(id, seeds, flags, context) .. "\n")
-    end
+        if not itemID
+            or itemID >= 0
+        then
+            Utility.Log("Usage: msd4r_tm <glitched item id>.")
 
-    if command == "msd_tm_probe" then
-        local seed = tonumber(params:match("^%s*(%d+)%s*$"))
-        if not seed or seed < 2 or seed > 0xffffffff or seed % 1 ~= 0 then
-            Isaac.ConsoleOutput("Usage: msd_tm_probe 123456789 (creates one diagnostic item config, flags=0)\n")
             return
         end
-        if not ProceduralItemManager or ProceduralItemManager.GetProceduralItemCount() >= 1024 then
-            Isaac.ConsoleOutput("Procedural item manager unavailable or at capacity.\n")
-            return
+
+        local seedSources = {}
+
+        if ProceduralSeedTracker.SeedSources
+            and ProceduralSeedTracker.SeedSources[itemID]
+        then
+            seedSources = ProceduralSeedTracker.SeedSources[itemID]
         end
-        local ok, id = pcall(ProceduralItemManager.CreateProceduralItem, seed, 0)
-        if not ok then
-            Isaac.ConsoleOutput("Native probe failed: " .. tostring(id) .. "\n"); return
-        end
-        if id >= 0x80000000 then id = id - 0x100000000 end
-        if id >= 0 then
-            Isaac.ConsoleOutput("Native probe did not return a procedural item ID.\n"); return
-        end
-        ProceduralSeedTracker:SetSeed(id, seed, 'probe.CreateProceduralItem(seed,0)')
-        diagnostic(id, { seed }, 0, 'fixed-seed-native-probe')
+
+        Renderer.GlitchedItemRenderer:Reset()
+        Utility.Log(
+            Renderer.GlitchedItemRenderer:WriteLog(
+                itemID,
+                ProceduralSeedTracker:GetSeed(itemID),
+                nil,
+                {
+                    Kind = 'existing-item',
+                    RunSeed = ProceduralSeedTracker:GetCurrentRunSeed(),
+                    SeedSources = seedSources
+                }
+            )
+        )
+
         return
     end
-
-    if command == "msd_tm" then
-        local id, seed = params:match("^%s*(-?%d+)%s*(%d*)%s*$")
-        id = tonumber(id)
-        seed = tonumber(seed)
-        if not id or id >= 0 then
-            Isaac.ConsoleOutput("Usage: msd_tm -1 [known_creation_seed]\n")
-            return
-        end
-        if seed then ProceduralSeedTracker:SetSeed(id, seed, 'msd_tm.explicit') end
-        diagnostic(id, seed and { seed } or ProceduralSeedTracker:GetSeed(id), nil, 'existing-item')
-        return
-    end
-
-    PauseMenuController:OnExecuteCommand(command, params)
 end
 
-MSD4R:AddCallback(
+MSD4R:RegisterAvailableCallback(
     ModCallbacks.MC_EXECUTE_CMD,
     MSD4R.OnExecuteCommand
 )
 
+if type(ModCallbacks.MC_POST_MODS_LOADED) ~= "number" then
+    CoreAPI:ReportUnavailable(
+        "Core",
+        { "ModCallbacks.MC_POST_MODS_LOADED" }
+    )
+end
+
+---@type MSD4RMod
 return MSD4R

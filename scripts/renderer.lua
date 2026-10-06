@@ -1,7 +1,29 @@
+---@type MSD4RUtility
+local Utility = include("scripts/utility")
+
+---@class MSD4RRenderer
+---@field Mod MSD4RMod
+---@field EID MSD4REID
+---@field ModSave MSD4RModSave
+---@field HiddenPauseMenuLayers MSD4RHiddenLayer[]
+---@field PauseMenuSpritesheetReplaced boolean
+---@field ReplacedPauseMenuLayerName string?
+---@field OriginalPauseMenuSpritesheet string?
+---@field ModTrinketSprites table<integer, Sprite>
+---@field GlitchedItemRenderer MSD4RGlitchedItemRenderer
+---@field TrinketSprite Sprite
+---@field AvatarSprite Sprite
+---@field SetFixedLayoutBrightness boolean
 local Renderer = {}
+
+---@type MSD4RGlitchedItemRenderer
 local GlitchedItemRenderer = include("scripts/glitched_item_renderer")
+---@type MSD4RMagicConstants
 local MAGIC_CONST = include("scripts/magic_const")
+---@type MSD4RUIConfig
 local UI_CONFIG = include("scripts/ui_config")
+
+---@type MSD4RRendererConfig
 local CONFIG = {
     PAUSE_MENU_RENDER_ORIGIN_OFFSET = Vector(48, 0),
     PIVOT_AT_ITEMS_DISPLAY_ROW_NUMBER = 1 - (1 / 16),
@@ -18,17 +40,8 @@ local CONFIG = {
     FIXED_MY_STUFF_PAGE_PIVOT = Vector(60, 60),
     FIXED_MY_STUFF_PAGE_SIZE = Vector(128, 128),
 
-    --[[
-    Large ANM2 positions such as (-500, -500) are commonly used to
-    hide a layer off-screen. Treat them as an opt-out from auto layout.
-    ]]
     MY_STUFF_FRAME_POSITION_LIMIT = 400,
 
-    --[[
-    A scale outside this range is almost an animation transition, a hidden layer,
-    or an unsupported layout. Item rendering only happens on pause menu's idle frame,
-    but these guards make the fallback explicit.
-    ]]
     AUTO_LAYOUT_MIN_SCALE = 0.1,
     AUTO_LAYOUT_MAX_SCALE = 3.0,
 
@@ -92,9 +105,12 @@ local CONFIG = {
         [PlayerType.PLAYER_JACOB_B] = 34,
         [PlayerType.PLAYER_JACOB2_B] = 34,
     },
+
     PLACEHOLDER_AVATAR_LAYER_ID = 35
 }
 
+---@param mod MSD4RMod
+---@return nil # No return value.
 function Renderer:Initialize(mod)
     self.Mod = mod
     self.EID = mod.EID
@@ -105,6 +121,7 @@ function Renderer:Initialize(mod)
     self.OriginalPauseMenuSpritesheet = nil
     self.ModTrinketSprites = {}
     self.GlitchedItemRenderer = GlitchedItemRenderer
+    self.SetFixedLayoutBrightness = false
 
     self.GlitchedItemRenderer:Initialize()
 
@@ -123,6 +140,9 @@ function Renderer:Initialize(mod)
     self.AvatarSprite:Play("Main", true)
 end
 
+---@param left Vector
+---@param right Vector
+---@return Vector result1
 function Renderer:MultiplyVector(left, right)
     return Vector(
         left.X * right.X,
@@ -130,6 +150,8 @@ function Renderer:MultiplyVector(left, right)
     )
 end
 
+---@param scale Vector
+---@return Vector result1
 function Renderer:NormalizeFrameScale(scale)
     --[[
     AnimationFrame values correspond to ANM2 values.
@@ -150,6 +172,7 @@ function Renderer:NormalizeFrameScale(scale)
     return Vector(x, y)
 end
 
+---@return Vector result1
 function Renderer:GetPauseMenuOrigin()
     return Vector(
         math.floor(Isaac.GetScreenWidth() * 0.5),
@@ -157,6 +180,7 @@ function Renderer:GetPauseMenuOrigin()
     ) + CONFIG.PAUSE_MENU_RENDER_ORIGIN_OFFSET
 end
 
+---@return Vector result1
 function Renderer:GetPauseMenuExtraOffset()
     return Vector(
         math.floor(Isaac.GetScreenWidth() / 10 - 48),
@@ -164,11 +188,19 @@ function Renderer:GetPauseMenuExtraOffset()
     )
 end
 
+---@return Vector result1
 function Renderer:GetPauseMenuAnchor()
     return self:GetPauseMenuOrigin() + self:GetPauseMenuExtraOffset()
 end
 
+---@param animation AnimationData?
+---@param layerID integer
+---@return AnimationFrame? result1
 function Renderer:GetLayerFrame(animation, layerID)
+    if not animation then
+        return nil
+    end
+
     local animationLayer = animation:GetLayer(layerID)
     if not animationLayer
         or not animationLayer:IsVisible()
@@ -184,6 +216,9 @@ function Renderer:GetLayerFrame(animation, layerID)
     return frame
 end
 
+---@param pauseBody? Sprite
+---@param layerName string
+---@return MSD4RFrameInfo? result1
 function Renderer:GetRawFrameInfo(pauseBody, layerName)
     if not pauseBody then
         return nil
@@ -242,6 +277,9 @@ function Renderer:GetRawFrameInfo(pauseBody, layerName)
     }
 end
 
+---@param pauseBody? Sprite
+---@param layerName string
+---@return MSD4RFrameInfo? result1
 function Renderer:GetFrameInfo(pauseBody, layerName)
     local frameInfo = self:GetRawFrameInfo(pauseBody, layerName)
     if not frameInfo then
@@ -253,6 +291,8 @@ function Renderer:GetFrameInfo(pauseBody, layerName)
     return frameInfo
 end
 
+---@param pauseBody? Sprite
+---@return boolean result1
 function Renderer:IsClassicMyStuffLayout(pauseBody)
     local myStuffFrameInfo = self:GetFrameInfo(pauseBody, "MyStuff")
     if not myStuffFrameInfo then
@@ -267,6 +307,7 @@ function Renderer:IsClassicMyStuffLayout(pauseBody)
         and math.abs(myStuffFrameInfo.Position.Y) < CONFIG.MY_STUFF_FRAME_POSITION_LIMIT
 end
 
+---@return MSD4RLayout result1
 function Renderer:GetFixedLayout()
     local offset = self.ModSave:GetOffset()
     local itemsDisplayOffset = Vector(
@@ -300,6 +341,8 @@ function Renderer:GetFixedLayout()
     }
 end
 
+---@param frameInfo? MSD4RFrameInfo
+---@return MSD4RLayout? result1
 function Renderer:GetAutoLayout(frameInfo)
     if not frameInfo then
         return nil
@@ -333,6 +376,8 @@ function Renderer:GetAutoLayout(frameInfo)
     }
 end
 
+---@param pauseBody? Sprite
+---@return MSD4RLayout result1
 function Renderer:GetLayout(pauseBody)
     local myStuffFrameInfo = self:GetFrameInfo(pauseBody, "MyStuff")
 
@@ -347,7 +392,18 @@ function Renderer:GetLayout(pauseBody)
     return self:GetFixedLayout()
 end
 
+---@param pauseBody? Sprite
+---@return nil # No return value.
 function Renderer:ReplacePauseMenuSpritesheet(pauseBody)
+    if self.PauseMenuSpritesheetReplaced
+        or not pauseBody
+    then
+        return
+    end
+
+    ---@param layerName string
+    ---@param imagePath string
+    ---@return nil # No return value.
     local function replaceSpritesheet(layerName, imagePath)
         for _, layer in ipairs(pauseBody:GetAllLayers()) do
             if layer:GetName() == layerName then
@@ -361,12 +417,6 @@ function Renderer:ReplacePauseMenuSpritesheet(pauseBody)
                 return
             end
         end
-    end
-
-    if self.PauseMenuSpritesheetReplaced
-        or not pauseBody
-    then
-        return
     end
 
     if not self:IsClassicMyStuffLayout(pauseBody) then
@@ -384,6 +434,9 @@ function Renderer:ReplacePauseMenuSpritesheet(pauseBody)
     )
 end
 
+---@param spriteName "PauseMenu"|"PauseStats"
+---@param layer? LayerState
+---@return nil # No return value.
 function Renderer:HideLayer(spriteName, layer)
     if not layer
         or not layer:IsVisible()
@@ -398,6 +451,8 @@ function Renderer:HideLayer(spriteName, layer)
     })
 end
 
+---@param pauseBody? Sprite
+---@return nil # No return value.
 function Renderer:HideOriginalMyStuffPage(pauseBody)
     if not pauseBody then
         return
@@ -424,6 +479,9 @@ function Renderer:HideOriginalMyStuffPage(pauseBody)
     end
 end
 
+---@param pauseBody? Sprite
+---@param pauseStats? Sprite
+---@return nil # No return value.
 function Renderer:HidePartialPauseMenu(pauseBody, pauseStats)
     if pauseStats
         and self:IsClassicMyStuffLayout(pauseBody)
@@ -449,6 +507,7 @@ function Renderer:HidePartialPauseMenu(pauseBody, pauseStats)
     end
 end
 
+---@return nil # No return value.
 function Renderer:RestorePauseMenuSpritesheet()
     if not self.PauseMenuSpritesheetReplaced then
         return
@@ -477,6 +536,7 @@ function Renderer:RestorePauseMenuSpritesheet()
     self.OriginalPauseMenuSpritesheet = nil
 end
 
+---@return nil # No return value.
 function Renderer:RestorePauseMenuLayers()
     local pauseMenuSprite = PauseMenu.GetSprite()
     local pauseStatsSprite = PauseMenu.GetStatsSprite()
@@ -511,6 +571,9 @@ function Renderer:RestorePauseMenuLayers()
     end
 end
 
+---@param pauseBody? Sprite
+---@param layerName string
+---@return nil # No return value.
 function Renderer:RenderPauseMenuLayer(
     pauseBody,
     layerName
@@ -540,12 +603,20 @@ function Renderer:RenderPauseMenuLayer(
     layer:SetVisible(isVisible)
 end
 
+---@param itemID integer
+---@param position Vector
+---@param scale Vector
+---@param proceduralSeed? integer[]
+---@return nil # No return value.
 function Renderer:RenderItemIcon(
     itemID,
     position,
     scale,
     proceduralSeed
 )
+    ---@param renderPosition Vector
+    ---@param color Color
+    ---@return nil # No return value.
     local function renderConditionally(renderPosition, color)
         local currentItemID = itemID
         local renderedGlitchedItemIcon = false
@@ -584,7 +655,7 @@ function Renderer:RenderItemIcon(
     end
 
     if outlineOffsets
-        and itemID >= 0
+        and itemID > 0
     then
         for _, offset in ipairs(outlineOffsets) do
             renderConditionally(
@@ -600,6 +671,8 @@ function Renderer:RenderItemIcon(
     )
 end
 
+---@param trinketID integer
+---@return Sprite? result1
 function Renderer:GetModTrinketSprite(trinketID)
     trinketID = trinketID & TrinketType.TRINKET_ID_MASK
     if self.ModTrinketSprites[trinketID] then
@@ -621,6 +694,10 @@ function Renderer:GetModTrinketSprite(trinketID)
     return modTrinketSprite
 end
 
+---@param trinketID integer
+---@param position Vector
+---@param scale Vector
+---@return nil # No return value.
 function Renderer:RenderModTrinketIcon(
     trinketID,
     position,
@@ -636,6 +713,10 @@ function Renderer:RenderModTrinketIcon(
     modTrinketSprite:Render(position)
 end
 
+---@param trinketID integer
+---@param position Vector
+---@param scale Vector
+---@return nil # No return value.
 function Renderer:RenderTrinketIcon(
     trinketID,
     position,
@@ -681,6 +762,10 @@ function Renderer:RenderTrinketIcon(
     )
 end
 
+---@param pauseBody? Sprite
+---@param itemCount integer
+---@param firstColumnNumber integer
+---@return nil # No return value.
 function Renderer:RenderStuffArrows(
     pauseBody,
     itemCount,
@@ -706,6 +791,10 @@ function Renderer:RenderStuffArrows(
     end
 end
 
+---@param playerType integer
+---@param renderPosition Vector
+---@param scale Vector
+---@return boolean result1
 function Renderer:RenderModAvatar(
     playerType,
     renderPosition,
@@ -732,6 +821,10 @@ function Renderer:RenderModAvatar(
     return true
 end
 
+---@param playerType integer
+---@param playerCount integer
+---@param layout MSD4RLayout
+---@return nil # No return value.
 function Renderer:RenderAvatar(
     playerType,
     playerCount,
@@ -797,6 +890,10 @@ function Renderer:RenderAvatar(
     end
 end
 
+---@param index integer
+---@param firstColumnNumber integer
+---@param layout MSD4RLayout
+---@return Vector result1
 function Renderer:GetItemSlotPosition(
     index,
     firstColumnNumber,
@@ -814,6 +911,10 @@ function Renderer:GetItemSlotPosition(
         )
 end
 
+---@param index integer
+---@param firstColumnNumber integer
+---@param layout MSD4RLayout
+---@return nil # No return value.
 function Renderer:RenderCursor(
     index,
     firstColumnNumber,
@@ -848,6 +949,8 @@ function Renderer:RenderCursor(
     )
 end
 
+---@param glitchedItemID integer
+---@return MSD4RDescription? result1
 function Renderer:GetGlitchedItemDescription(glitchedItemID)
     glitchedItemID = glitchedItemID + MAGIC_CONST.GLITCHED_ITEM_MASK
 
@@ -856,17 +959,17 @@ function Renderer:GetGlitchedItemDescription(glitchedItemID)
         return nil
     end
 
-    local successful, description = pcall(
+    local successful, descriptionOrError = pcall(
         self.EID.CheckGlitchedItemConfig,
         self.EID,
         glitchedItemID
     )
 
     if not successful then
-        Isaac.ConsoleOutput(
-            "[MSD4R] Failed to get glitched item description: "
-            .. tostring(description)
-            .. "\n"
+        Utility.Log(
+            "Failed to get glitched item description: "
+            .. tostring(descriptionOrError)
+            .. "."
         )
 
         return nil
@@ -874,10 +977,13 @@ function Renderer:GetGlitchedItemDescription(glitchedItemID)
 
     return {
         Name = itemConfig.Name .. " - {{Quality0}}",
-        Description = description
+        Description = descriptionOrError
     }
 end
 
+---@param itemID integer
+---@param isTrinket boolean
+---@return MSD4RDescription? result1
 function Renderer:GetDescription(itemID, isTrinket)
     if not isTrinket
         and itemID < 0
@@ -890,7 +996,7 @@ function Renderer:GetDescription(itemID, isTrinket)
         entityType = PickupVariant.PICKUP_TRINKET
     end
 
-    local successful, descriptionObj = pcall(
+    local successful, descriptionBodyOrError = pcall(
         self.EID.getDescriptionObj,
         self.EID,
         EntityType.ENTITY_PICKUP,
@@ -901,29 +1007,32 @@ function Renderer:GetDescription(itemID, isTrinket)
     )
 
     if not successful then
-        Isaac.ConsoleOutput(string.format(
-            "[MSD4R] Failed to get EID description: %s\n",
-            tostring(descriptionObj)
+        Utility.Log(string.format(
+            "Failed to get EID description: %s.",
+            tostring(descriptionBodyOrError)
         ))
 
         return nil
     end
 
     if not isTrinket then
-        local quality = descriptionObj.Quality
+        local quality = descriptionBodyOrError.Quality
         if not quality then
             quality = 0
         end
 
-        descriptionObj.Name = descriptionObj.Name
+        descriptionBodyOrError.Name = descriptionBodyOrError.Name
             .. " - {{Quality"
             .. tostring(quality)
             .. "}}"
     end
 
-    return descriptionObj
+    return descriptionBodyOrError
 end
 
+---@param slot MSD4RItemSlot
+---@param layout? MSD4RLayout
+---@return nil # No return value.
 function Renderer:RenderDescription(slot, layout)
     local description = self:GetDescription(slot.ID, slot.IsTrinket)
 
@@ -969,55 +1078,66 @@ function Renderer:RenderDescription(slot, layout)
     end
     renderPosition = renderPosition + self.ModSave:GetOffset()
 
-    local successful, error = pcall(function()
-        local textScale = Vector(
-            self.EID.Scale,
-            self.EID.Scale
-        )
-
-        if description.Name
-            and description.Name ~= ""
-        then
-            local nameColor = self.EID:getNameColor()
-
-            self.EID:renderString(
-                description.Name,
-                renderPosition,
-                textScale,
-                nameColor
+    local successful, error = pcall(
+    ---@return nil # No return value.
+        function()
+            local textScale = Vector(
+                self.EID.Scale,
+                self.EID.Scale
             )
-            renderPosition.Y = renderPosition.Y
-                + self.EID.lineHeight
-                * self.EID.Scale
-        end
 
-        if description.Description
-            and description.Description ~= ""
-        then
-            self.EID:printBulletPoints(
-                description.Description,
-                renderPosition,
-                description.IgnoreBulletPointIconConfig
-            )
+            if description.Name
+                and description.Name ~= ""
+            then
+                local nameColor = self.EID:getNameColor()
+
+                self.EID:renderString(
+                    description.Name,
+                    renderPosition,
+                    textScale,
+                    nameColor
+                )
+                renderPosition.Y = renderPosition.Y
+                    + self.EID.lineHeight
+                    * self.EID.Scale
+            end
+
+            if description.Description
+                and description.Description ~= ""
+            then
+                self.EID:printBulletPoints(
+                    description.Description,
+                    renderPosition,
+                    description.IgnoreBulletPointIconConfig
+                )
+            end
         end
-    end)
+    )
 
     self.EID.Scale = prevScale
     self.EID.Config["TextboxWidth"] = prevTextboxWidth
     self.EID.InsideItemReminder = prevInsideItemReminder
 
     if not successful then
-        Isaac.ConsoleOutput(string.format(
-            "[MSD4R] EID rendering error: %s\n",
+        Utility.Log(string.format(
+            "EID rendering error: %s.",
             tostring(error)
         ))
     end
 end
 
+---@param pauseBody? Sprite
+---@return nil # No return value.
 function Renderer:RenderEmptyMyStuffPage(pauseBody)
     self:RenderPauseMenuLayer(pauseBody, "MyStuff")
 end
 
+---@param pauseBody? Sprite
+---@param playerType integer
+---@param itemSlots? MSD4RItemSlot[]
+---@param firstColumnNumber integer
+---@param playerCount integer
+---@return nil # No return value.
 function Renderer:RenderMyStuffPage(
     pauseBody,
     playerType,
@@ -1046,7 +1166,10 @@ function Renderer:RenderMyStuffPage(
     )
 
     if layout.Mode == "fixed" then
-        self.ModSave:Set("IconBrightness", 20)
+        if not self.SetFixedLayoutBrightness then
+            self.ModSave:Set("IconBrightness", 20)
+            self.SetFixedLayoutBrightness = true
+        end
     end
 
     for i = firstVisibleIndex, lastVisibleIndex do
@@ -1059,6 +1182,7 @@ function Renderer:RenderMyStuffPage(
                 layout
             )
             if not itemSlot.IsTrinket then
+                ---@cast itemSlot MSD4RCollectibleSlot
                 self:RenderItemIcon(
                     itemSlot.ID,
                     position,
@@ -1090,6 +1214,11 @@ function Renderer:RenderMyStuffPage(
     )
 end
 
+---@param pauseBody? Sprite
+---@param slot MSD4RItemSlot
+---@param selectedIndex integer
+---@param firstColumnNumber integer
+---@return nil # No return value.
 function Renderer:RenderInspect(
     pauseBody,
     slot,
@@ -1105,223 +1234,5 @@ function Renderer:RenderInspect(
     self:RenderDescription(slot, layout)
 end
 
-function Renderer:DrawPivot(position)
-    local size = Vector(2, 2)
-
-    Isaac.DrawQuad(
-        position - size,
-        position + Vector(size.X, -size.Y),
-        position + Vector(-size.X, size.Y),
-        position + size,
-        KColor(0, 1, 0, 1),
-        1
-    )
-end
-
-function Renderer:DrawMyStuffBounds(pauseBody)
-    local myStuffFrameInfo = self:GetFrameInfo(pauseBody, "MyStuff")
-    if not myStuffFrameInfo then
-        return
-    end
-
-    local topLeft = myStuffFrameInfo.TopLeft
-    local bottomRight = topLeft + myStuffFrameInfo.Size
-    local topRight = Vector(
-        bottomRight.X,
-        topLeft.Y
-    )
-    local bottomLeft = Vector(
-        topLeft.X,
-        bottomRight.Y
-    )
-    local thickness = 1
-    local color = KColor(1, 0, 0, 1)
-
-    -- Top edge
-    Isaac.DrawQuad(
-        topLeft,
-        topRight,
-        topLeft + Vector(0, thickness),
-        topRight + Vector(0, thickness),
-        color,
-        1
-    )
-    -- Bottom edge
-    Isaac.DrawQuad(
-        bottomLeft - Vector(0, thickness),
-        bottomRight - Vector(0, thickness),
-        bottomLeft,
-        bottomRight,
-        color,
-        1
-    )
-    -- Left edge
-    Isaac.DrawQuad(
-        topLeft,
-        topLeft + Vector(thickness, 0),
-        bottomLeft,
-        bottomLeft + Vector(thickness, 0),
-        color,
-        1
-    )
-    -- Right edge
-    Isaac.DrawQuad(
-        topRight - Vector(thickness, 0),
-        topRight,
-        bottomRight - Vector(thickness, 0),
-        bottomRight,
-        color,
-        1
-    )
-
-    self:DrawPivot(myStuffFrameInfo.TopLeft + self:MultiplyVector(
-        myStuffFrameInfo.Pivot,
-        myStuffFrameInfo.Scale
-    ))
-end
-
-function Renderer:DumpSpriteInfo(name, sprite)
-    if not sprite then
-        Isaac.ConsoleOutput(string.format(
-            "[MSD4R] Sprite %s: nil\n",
-            name
-        ))
-
-        return
-    end
-
-    Isaac.ConsoleOutput(string.format(
-        "\n[MSD4R] ===== Sprite %s =====\n",
-        name
-    ))
-
-    Isaac.ConsoleOutput(string.format(
-        "[MSD4R] Sprite info:\n"
-        .. "        spriteOffset=(%.1f, %.1f)\n"
-        .. "        spriteScale=(%.3f, %.3f)\n"
-        .. "        animation=%s\n"
-        .. "        frame=%d\n",
-        sprite.Offset.X,
-        sprite.Offset.Y,
-        sprite.Scale.X,
-        sprite.Scale.Y,
-        sprite:GetAnimation(),
-        sprite:GetFrame()
-    ))
-
-    for _, layer in ipairs(sprite:GetAllLayers()) do
-        Isaac.ConsoleOutput(string.format(
-            "[MSD4R] Layer %s:\n"
-            .. "        id=%d\n"
-            .. "        visible=%s\n"
-            .. "        sheet=%s\n",
-            layer:GetName(),
-            layer:GetLayerID(),
-            tostring(layer:IsVisible()),
-            layer:GetSpritesheetPath()
-        ))
-    end
-end
-
-function Renderer:DumpLayoutInfo(pauseBody)
-    if not pauseBody then
-        Isaac.ConsoleOutput("[MSD4R] Layout: nil\n")
-        return
-    end
-
-    local layout = self:GetLayout(pauseBody)
-    Isaac.ConsoleOutput(string.format(
-        "\n[MSD4R] ===== Layout =====\n"
-        .. "        mode=%s\n"
-        .. "        itemOrigin=(%.1f, %.1f)\n"
-        .. "        itemScale=(%.3f, %.3f)\n",
-        layout.Mode,
-        layout.ItemOrigin.X,
-        layout.ItemOrigin.Y,
-        layout.ItemScale.X,
-        layout.ItemScale.Y
-    ))
-end
-
-function Renderer:DumpMyStuffFrameInfo(pauseBody, layerName)
-    local myStuffFrameInfo = self:GetFrameInfo(pauseBody, layerName)
-    if not myStuffFrameInfo then
-        Isaac.ConsoleOutput(string.format("[MSD4R] %s frame: nil\n", layerName))
-        return
-    end
-
-    Isaac.ConsoleOutput(string.format(
-        "\n[MSD4R] ===== %s frame =====\n"
-        .. "        pos=(%.1f, %.1f)\n"
-        .. "        pivot=(%.1f, %.1f)\n"
-        .. "        scale=(%.3f, %.3f)\n"
-        .. "        widthHeight=(%.1f, %.1f)\n"
-        .. "        size=(%.1f, %.1f)\n"
-        .. "        topLeft=(%.1f, %.1f)\n",
-        layerName,
-        myStuffFrameInfo.Position.X,
-        myStuffFrameInfo.Position.Y,
-        myStuffFrameInfo.Pivot.X,
-        myStuffFrameInfo.Pivot.Y,
-        myStuffFrameInfo.Scale.X,
-        myStuffFrameInfo.Scale.Y,
-        myStuffFrameInfo.Width,
-        myStuffFrameInfo.Height,
-        myStuffFrameInfo.Size.X,
-        myStuffFrameInfo.Size.Y,
-        myStuffFrameInfo.TopLeft.X,
-        myStuffFrameInfo.TopLeft.Y
-    ))
-end
-
-function Renderer:DumpScreenInfo()
-    local screenCenter = Vector(
-        math.floor(Isaac.GetScreenWidth() * 0.5),
-        math.floor(Isaac.GetScreenHeight() * 0.5)
-    )
-    local extraOffset = self:GetPauseMenuExtraOffset()
-    local pauseAnchor = self:GetPauseMenuAnchor()
-    local eidCenter = self.Mod.EID:getScreenSize() / 2
-
-    Isaac.ConsoleOutput(string.format(
-        "\n[MSD4R] ===== Screen =====\n"
-        .. "        screenSize=(%.1f, %.1f)\n"
-        .. "        screenCenter=(%.1f, %.1f)\n"
-        .. "        extraOffset=(%.1f, %.1f)\n"
-        .. "        anchor=(%.1f, %.1f)\n"
-        .. "        eidCenter=(%.1f, %.1f)\n",
-        Isaac.GetScreenWidth(),
-        Isaac.GetScreenHeight(),
-        screenCenter.X,
-        screenCenter.Y,
-        extraOffset.X,
-        extraOffset.Y,
-        pauseAnchor.X,
-        pauseAnchor.Y,
-        eidCenter.X,
-        eidCenter.Y
-    ))
-end
-
-function Renderer:DumpRenderInfo()
-    local pauseBody = PauseMenu.GetSprite()
-
-    self:DumpSpriteInfo(
-        "Pause Menu",
-        pauseBody
-    )
-    self:DumpSpriteInfo(
-        "Pause Stats",
-        PauseMenu.GetStatsSprite()
-    )
-    self:DumpSpriteInfo(
-        "My Stuff",
-        PauseMenu.GetMyStuffSprite()
-    )
-    self:DumpLayoutInfo(pauseBody)
-    self:DumpScreenInfo()
-    self:DumpMyStuffFrameInfo(pauseBody, "MyStuff")
-    self:DumpMyStuffFrameInfo(pauseBody, "Paper")
-end
-
+---@type MSD4RRenderer
 return Renderer

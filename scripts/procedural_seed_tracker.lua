@@ -1,10 +1,24 @@
+---@class MSD4RProceduralSeedTracker
+---@field ModSave MSD4RModSave
+---@field RunSeed integer
+---@field ItemIDToSeeds MSD4RSeedMap
+---@field SeedSources MSD4RSeedSourceMap
+---@field PendingSeeds MSD4RSeedMap
+---@field RerollWindows table<integer, MSD4RRerollWindow[]>
 local ProceduralSeedTracker = {}
 
+---@type MSD4RMagicConstants
+local MAGIC_CONST = include("scripts/magic_const")
+---@type MSD4RReplayController
 local ReplayController = include("scripts/replay_controller")
+---@type MSD4RUtility
 local Utility = include("scripts/utility")
 
+---@type Game
 local game = Game()
 
+---@param seed any
+---@return integer result1
 function ProceduralSeedTracker:NormalizeSeed(seed)
     seed = tonumber(seed)
     if not seed then
@@ -14,14 +28,15 @@ function ProceduralSeedTracker:NormalizeSeed(seed)
     return Utility.ConvertToU32(math.floor(seed))
 end
 
+---@return nil # No return value.
 function ProceduralSeedTracker:UpdateProceduralSeeds()
     local savedSeeds = self.ModSave:GetProceduralSeeds()
     if type(savedSeeds) == "table" then
         for rawID, seeds in pairs(savedSeeds) do
-            local itemId = Utility.ConvertToID32(rawID)
-            if itemId
-                and itemId < 0
-                and itemId >= -1024
+            local itemID = Utility.ConvertToID32(rawID)
+            if itemID
+                and itemID < 0
+                and itemID >= -MAGIC_CONST.PROCEDURAL_ITEM_SURFACE_COUNT
             then
                 if type(seeds) ~= "table" then
                     seeds = { seeds }
@@ -37,12 +52,14 @@ function ProceduralSeedTracker:UpdateProceduralSeeds()
                     end
                 end
 
-                self.ItemIDToSeeds[itemId] = itemSeeds
+                self.ItemIDToSeeds[itemID] = itemSeeds
             end
         end
     end
 end
 
+---@param mod MSD4RMod
+---@return nil # No return value.
 function ProceduralSeedTracker:Initialize(mod)
     self.ModSave = mod.ModSave
     self.RunSeed = self:NormalizeSeed(self.ModSave:GetRunSeed())
@@ -54,10 +71,13 @@ function ProceduralSeedTracker:Initialize(mod)
     self:UpdateProceduralSeeds()
 end
 
+---@return integer result1
 function ProceduralSeedTracker:GetCurrentRunSeed()
     return self:NormalizeSeed(game:GetSeeds():GetStartSeed())
 end
 
+---@param seed integer
+---@return integer result1
 function ProceduralSeedTracker:GetNextSelectionSeed(seed)
     seed = Utility.ConvertToU32(seed)
     seed = Utility.ConvertToU32(seed ~ (seed >> 5))
@@ -65,6 +85,7 @@ function ProceduralSeedTracker:GetNextSelectionSeed(seed)
     return Utility.ConvertToU32(seed ~ (seed >> 7))
 end
 
+---@return nil # No return value.
 function ProceduralSeedTracker:Save()
     if not self.ModSave then
         return
@@ -79,6 +100,8 @@ function ProceduralSeedTracker:Save()
     self.ModSave:Set("ProceduralSeeds", proceduralSeeds)
 end
 
+---@param id integer
+---@return integer[]? result1
 function ProceduralSeedTracker:GetSeed(id)
     id = Utility.ConvertToID32(id)
 
@@ -132,13 +155,19 @@ function ProceduralSeedTracker:GetSeed(id)
     return candidateSeeds
 end
 
+---@param id integer
+---@param seed integer
+---@param source? string
+---@return nil # No return value.
 function ProceduralSeedTracker:SetSeed(id, seed, source)
+    ---@param seedMap MSD4RSeedMap
+    ---@return boolean result1
     local function appendSeed(seedMap)
         if not seedMap[id] then
             seedMap[id] = {}
         end
 
-        local length = seedMap[id]
+        local length = #seedMap[id]
         if length >= 8 then
             return false
         end
@@ -158,7 +187,7 @@ function ProceduralSeedTracker:SetSeed(id, seed, source)
     seed = self:NormalizeSeed(seed)
 
     if id >= 0
-        or id < -1024
+        or id < -MAGIC_CONST.PROCEDURAL_ITEM_SURFACE_COUNT
         or seed == 0
     then
         return
@@ -202,6 +231,11 @@ function ProceduralSeedTracker:SetSeed(id, seed, source)
     end
 end
 
+---@param selected integer
+---@param pool integer
+---@param decrease boolean
+---@param seed integer
+---@return nil # No return value.
 function ProceduralSeedTracker:OnPostGetCollectible(
     selected,
     pool,
@@ -215,6 +249,9 @@ function ProceduralSeedTracker:OnPostGetCollectible(
     )
 end
 
+---@param pickup? EntityPickup
+---@param phase? string
+---@return nil # No return value.
 function ProceduralSeedTracker:OnPostPickupUpdate(pickup, phase)
     if not pickup
         or pickup.Variant ~= PickupVariant.PICKUP_COLLECTIBLE
@@ -224,7 +261,7 @@ function ProceduralSeedTracker:OnPostPickupUpdate(pickup, phase)
 
     local id = Utility.ConvertToID32(pickup.SubType)
     if id >= 0
-        or id < -1024
+        or id < -MAGIC_CONST.PROCEDURAL_ITEM_SURFACE_COUNT
     then
         return
     end
@@ -256,8 +293,9 @@ function ProceduralSeedTracker:OnPostPickupUpdate(pickup, phase)
     end
 end
 
--- Only read the engine RNG. Next/SetSeed below are called on a fresh copy.
--- Key by player pointer; stacks keep nested uses and co-op players separate.
+---@param rng? RNG
+---@param player? EntityPlayer
+---@return nil # No return value.
 function ProceduralSeedTracker:OnPreUseD4(rng, player)
     if not ProceduralItemManager
         or not player
@@ -292,6 +330,10 @@ function ProceduralSeedTracker:OnPreUseD4(rng, player)
     self.RerollWindows[key][#self.RerollWindows[key] + 1] = window
 end
 
+---@param firstIndex integer
+---@param lastIndex integer
+---@param seeds integer[]
+---@return MSD4RMatchedSeed[] result1
 function ProceduralSeedTracker:MatchCreationSeeds(
     firstIndex,
     lastIndex,
@@ -349,6 +391,9 @@ function ProceduralSeedTracker:MatchCreationSeeds(
     return matchedSeeds
 end
 
+---@param window MSD4RRerollWindow
+---@param rng RNG
+---@return nil # No return value.
 function ProceduralSeedTracker:FinishD4(window, rng)
     if window.Run ~= self:GetCurrentRunSeed() then
         return
@@ -398,6 +443,9 @@ function ProceduralSeedTracker:FinishD4(window, rng)
     ))
 end
 
+---@param rng RNG
+---@param player EntityPlayer
+---@return nil # No return value.
 function ProceduralSeedTracker:OnPostUseD4(rng, player)
     local key = GetPtrHash(player)
 
@@ -412,6 +460,7 @@ function ProceduralSeedTracker:OnPostUseD4(rng, player)
     self:FinishD4(window, rng)
 end
 
+---@return nil # No return value.
 function ProceduralSeedTracker:OnRerollUpdate()
     local windows = self.RerollWindows
 
@@ -434,6 +483,7 @@ function ProceduralSeedTracker:OnRerollUpdate()
     end
 end
 
+---@return nil # No return value.
 function ProceduralSeedTracker:Clear()
     self.ItemIDToSeeds = {}
     self.SeedSources = {}
@@ -441,6 +491,8 @@ function ProceduralSeedTracker:Clear()
     self.RerollWindows = {}
 end
 
+---@param isContinued boolean
+---@return nil # No return value.
 function ProceduralSeedTracker:OnPostGameStarted(isContinued)
     local run = self:GetCurrentRunSeed()
     self.RerollWindows = {}
@@ -456,10 +508,12 @@ function ProceduralSeedTracker:OnPostGameStarted(isContinued)
     self:Save()
 end
 
+---@return nil # No return value.
 function ProceduralSeedTracker:OnPreGameExit()
     self:Save()
     self.PendingSeeds = {}
     self.RerollWindows = {}
 end
 
+---@type MSD4RProceduralSeedTracker
 return ProceduralSeedTracker

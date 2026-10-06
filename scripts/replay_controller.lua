@@ -1,7 +1,11 @@
+---@class MSD4RReplayController
+---@field CachedEnvironment MSD4REnvironment?
 local ReplayController = {}
 
+---@type MSD4RUtility
 local Utility = include("scripts/utility")
 
+---@type MSD4RReplayConfig
 local CONFIG = {
     INITIAL_GLOBAL_COLOR = 1,
     EXCLUDED_ACTIVE = {
@@ -56,21 +60,33 @@ local CONFIG = {
     }
 }
 
+---@class MSD4RReplayRNG
+---@field __index MSD4RReplayRNG
+---@field state integer
+---@field effect boolean?
+---@field draws integer
 local ReplayRNG = {}
 ReplayRNG.__index = ReplayRNG
 
+---@param seed integer
+---@param effect? boolean
+---@return nil # No return value.
 function ReplayRNG:Initialize(seed, effect)
     self.state = Utility.ConvertToU32(seed)
     self.effect = effect
     self.draws = 0
 end
 
+---@param seed integer
+---@param effect? boolean
+---@return MSD4RReplayRNG result1
 function ReplayRNG.New(seed, effect)
     local instance = setmetatable({}, ReplayRNG)
     instance:Initialize(seed, effect)
     return instance
 end
 
+---@return integer result1
 function ReplayRNG:Next()
     self.state = Utility.ConvertToU32(
         self.state ~ (
@@ -94,12 +110,17 @@ function ReplayRNG:Next()
     return self.state
 end
 
+---@param maxValue integer
+---@return integer result1
 function ReplayRNG:GetNextInt(maxValue)
-    return (maxValue > 0
-        and self:Next() % maxValue
-        or 0)
+    local state = self:Next()
+
+    return maxValue > 0
+        and state % maxValue
+        or 0
 end
 
+---@return number value
 function ReplayRNG:GetNextFloat()
     return Utility.ConvertToF32(
         Utility.ConvertToF32(self:Next())
@@ -107,12 +128,23 @@ function ReplayRNG:GetNextFloat()
     )
 end
 
+---@param n integer
+---@return nil # No return value.
 function ReplayRNG:Skip(n)
     for _ = 1, n do
         self:Next()
     end
 end
 
+---@return nil # No return value.
+function ReplayController:Reset()
+    self.CachedEnvironment = nil
+end
+
+---@param rng MSD4RReplayRNG
+---@param env MSD4REnvironment
+---@param kind integer
+---@return integer result1
 function ReplayController:ChooseVariant(rng, env, kind)
     local variants = env.byType[kind]
 
@@ -127,6 +159,10 @@ function ReplayController:ChooseVariant(rng, env, kind)
     )
 end
 
+---@param rng MSD4RReplayRNG
+---@param env MSD4REnvironment
+---@return MSD4REntitySelection result1
+---@return number result2
 function ReplayController:GetEntityA(rng, env)
     local kind = 0
     local variant = 0xFFFF
@@ -187,6 +223,10 @@ function ReplayController:GetEntityA(rng, env)
     }, weight
 end
 
+---@param rng MSD4RReplayRNG
+---@param env MSD4REnvironment
+---@return MSD4REntitySelection result1
+---@return number result2
 function ReplayController:GetEntityB(rng, env)
     local kind, variant, weight = 0, 0, 0
 
@@ -251,6 +291,11 @@ function ReplayController:GetEntityB(rng, env)
     }, weight
 end
 
+---@param seed integer
+---@param condition integer
+---@param action integer
+---@param env MSD4REnvironment
+---@return MSD4RReplayEffect result1
 function ReplayController:Effect(
     seed,
     condition,
@@ -429,15 +474,18 @@ function ReplayController:Effect(
     }
 end
 
+---@param state integer
+---@return MSD4RRecipeTile[] result1
+---@return integer result2
 function ReplayController:GetRecipe(state)
     local rng = ReplayRNG.New(state, false)
-    local tile = 0
-    local source = 0
+    local sourceTileIndex = 0
+    local sourceImageIndex = 0
     local color = 0
     local recipe = {}
 
     if rng:GetNextInt(5) == 0 then
-        tile = rng:GetNextInt(64)
+        sourceTileIndex = rng:GetNextInt(64)
     end
 
     if rng:GetNextInt(5) == 0 then
@@ -446,24 +494,24 @@ function ReplayController:GetRecipe(state)
 
     for i = 0, 63 do
         recipe[i + 1] = {
-            SourceTileIndex = tile,
-            SourceImageIndex = source,
+            SourceTileIndex = sourceTileIndex,
+            SourceImageIndex = sourceImageIndex,
             ColorIndex = color
         }
-        tile = tile + 1
+        sourceTileIndex = sourceTileIndex + 1
 
         if rng:GetNextInt(12) == 0 then
             color = rng:GetNextInt(4)
         end
 
-        if tile >= 64
+        if sourceTileIndex >= 64
             or rng:GetNextInt(12) == 0
         then
-            source = (source + 1) % 4
-            tile = i
+            sourceImageIndex = (sourceImageIndex + 1) % 4
+            sourceTileIndex = i
 
             if rng:GetNextInt(20) == 0 then
-                tile = i + 1
+                sourceTileIndex = i + 1
             end
 
             color = 0
@@ -477,6 +525,10 @@ function ReplayController:GetRecipe(state)
     return recipe, rng.state
 end
 
+---@param state integer
+---@param env MSD4REnvironment
+---@return MSD4RSourceItems result1
+---@return integer result2
 function ReplayController:GetSourceItems(state, env)
     local rng = ReplayRNG.New(state, false)
     local result = {}
@@ -501,6 +553,8 @@ function ReplayController:GetSourceItems(state, env)
     return result, rng.state
 end
 
+---@param seed integer
+---@return integer result1
 function ReplayController:GetTextState(seed)
     local rng = ReplayRNG.New(seed, false)
 
@@ -517,8 +571,11 @@ function ReplayController:GetTextState(seed)
     return rng.state
 end
 
+---@param seed integer
+---@param flags? integer
+---@return integer result1
 function ReplayController:GetEffectiveSeed(seed, flags)
-    seed = Utility.ConvertToF32(seed)
+    seed = Utility.ConvertToU32(seed)
 
     if not flags then
         flags = 0
@@ -535,6 +592,10 @@ function ReplayController:GetEffectiveSeed(seed, flags)
     return seed
 end
 
+---@param state integer
+---@param active boolean
+---@param env MSD4REnvironment
+---@return MSD4RPreEffects result1
 function ReplayController:GetPreEffects(state, active, env)
     local rng = ReplayRNG.New(state, false)
     local randoms = { 0, 0, 0, 0, 0, 0, 0 }
@@ -694,7 +755,14 @@ function ReplayController:GetPreEffects(state, active, env)
     }
 end
 
-function ReplayController:GetEffects(state, pre, env)
+---@param state integer
+---@param preEffects MSD4RPreEffects
+---@param env MSD4REnvironment
+---@return MSD4RReplayEffect[] result1
+---@return integer result2
+---@return number result3
+---@return MSD4REffectAttempt[] result4
+function ReplayController:GetEffects(state, preEffects, env)
     local rng = ReplayRNG.New(state, false)
     local totalScore = 0
     local effects = {}
@@ -702,16 +770,17 @@ function ReplayController:GetEffects(state, pre, env)
     local actions = { 0, 0, 1, 1, 2, 3, 4, 5 }
 
     for attemptIndex = 0, 99 do
-        if totalScore >= pre.Budget
+        if totalScore >= preEffects.Budget
             or #effects >= 8
         then
             break
         end
 
         local condition = 0
-        if condition ~= 3 then
+        if preEffects.ItemType ~= 3 then
             condition = rng:GetNextInt(7) + 1
         end
+
         if #effects > 0
             and rng:GetNextInt(4) ~= 0
         then
@@ -730,7 +799,7 @@ function ReplayController:GetEffects(state, pre, env)
             + effect.Score
         )
         local accepted = attemptIndex == 99
-            or nextTotalScore < pre.Budget
+            or nextTotalScore < preEffects.Budget
             or rng:GetNextInt(20) == 0
 
         attempts[#attempts + 1] = {
@@ -749,6 +818,10 @@ function ReplayController:GetEffects(state, pre, env)
     return effects, rng.state, totalScore, attempts
 end
 
+---@param state integer
+---@return integer result1
+---@return integer result2
+---@return integer result3
 function ReplayController:ProcessGraphicsPrelude(state)
     local rng = ReplayRNG.New(state, false)
     local devilPrice = rng:GetNextInt(2) + 1
@@ -761,6 +834,10 @@ function ReplayController:ProcessGraphicsPrelude(state)
     return rng.state, devilPrice, shopPrice
 end
 
+---@param seed integer
+---@param env MSD4REnvironment
+---@param flags? integer
+---@return MSD4RReplayResult result1
 function ReplayController:Replay(
     seed,
     env,
@@ -790,6 +867,7 @@ function ReplayController:Replay(
     )
 
     return {
+        ItemID = nil,
         EffectiveSeed = effectiveSeed,
         TextState = textState,
         PreEffects = preEffects,
@@ -806,6 +884,7 @@ function ReplayController:Replay(
     }
 end
 
+---@return MSD4REnvironment result1
 function ReplayController:BuildEnvironment()
     if self.CachedEnvironment then
         return self.CachedEnvironment
@@ -816,13 +895,12 @@ function ReplayController:BuildEnvironment()
         items = {},
         trinkets = {},
         active = {},
+        itemCount = config:GetCollectibles().Size,
+        trinketCount = config:GetTrinkets().Size,
         entities = {},
+        baseEntities = {},
         byType = {},
-        baseEntities = {}
     }
-
-    env.itemCount = config:GetCollectibles().Size
-    env.trinketCount = config:GetTrinkets().Size
 
     for id = 0, env.itemCount - 1 do
         local itemConfig = config:GetCollectible(id)
@@ -899,6 +977,9 @@ function ReplayController:BuildEnvironment()
 
     table.sort(
         env.entities,
+        ---@param entity1 MSD4REntityRecord
+        ---@param entity2 MSD4REntityRecord
+        ---@return boolean result1
         function(entity1, entity2)
             return entity1.key < entity2.key
         end
@@ -925,6 +1006,9 @@ function ReplayController:BuildEnvironment()
     return env
 end
 
+---@param instance ProceduralEffect
+---@param method string
+---@return MSD4REffectProperties result1
 function ReplayController:GetProperties(instance, method)
     if not instance[method] then
         return {}
@@ -942,6 +1026,8 @@ function ReplayController:GetProperties(instance, method)
     return properties
 end
 
+---@param proceduralItem ProceduralItem
+---@return MSD4RSnapshot result1
 function ReplayController:GetSnapshot(proceduralItem)
     local itemConfig = proceduralItem:GetItem()
     local snapshot = {
@@ -1001,14 +1087,29 @@ function ReplayController:GetSnapshot(proceduralItem)
     return snapshot
 end
 
+---@param replayResult MSD4RReplayResult
+---@param snapshot MSD4RSnapshot
+---@return boolean result1
+---@return string result2
+---@return MSD4RDifferenceReport result3
 function ReplayController:ValidateSnapshot(replayResult, snapshot)
     local differenceReport = {
+        ItemConfig = {},
         Differences = {},
         Checks = 0,
-        Matched = 0,
-        PrefixMatched = 0
+        MatchedCount = 0,
+        PrefixMatchedCount = 0,
+        IsPreEffectsMatched = false,
+        Valid = false,
+        Summary = ""
     }
 
+    ---@param field string
+    ---@param actualValue any
+    ---@param expectedValue any
+    ---@param isFloat? boolean
+    ---@param isEntity boolean|integer|nil
+    ---@return nil # No return value.
     local function checkField(
         field,
         actualValue,
@@ -1027,11 +1128,11 @@ function ReplayController:ValidateSnapshot(replayResult, snapshot)
             or (not isFloat
                 and actualValue == expectedValue)
         then
-            differenceReport.Matched = differenceReport.Matched + 1
+            differenceReport.MatchedCount = differenceReport.MatchedCount + 1
 
             if #differenceReport.Differences == 0 then
-                differenceReport.PrefixMatched =
-                    differenceReport.PrefixMatched + 1
+                differenceReport.PrefixMatchedCount =
+                    differenceReport.PrefixMatchedCount + 1
             end
         else
             differenceReport.Differences[
@@ -1054,12 +1155,14 @@ function ReplayController:ValidateSnapshot(replayResult, snapshot)
         differenceReport.Checks = differenceReport.Checks + 1
     end
 
-    local function formatValue(v)
-        if type(v) == 'number' then
-            return string.format('%.10g', v)
+    ---@param value any
+    ---@return string result1
+    local function formatValue(value)
+        if type(value) == 'number' then
+            return string.format('%.10g', value)
         end
 
-        return tostring(v)
+        return tostring(value)
     end
 
     local snapshotItem = snapshot.Item
@@ -1116,7 +1219,7 @@ function ReplayController:ValidateSnapshot(replayResult, snapshot)
         )
     end
 
-    differenceReport.PreMatched =
+    differenceReport.IsPreEffectsMatched =
         #differenceReport.Differences == 0
     checkField(
         "EffectCount",
@@ -1209,7 +1312,7 @@ function ReplayController:ValidateSnapshot(replayResult, snapshot)
         for _, differenceItem in ipairs(differenceReport.Differences) do
             differenceReport.Summary = differenceReport.Summary
                 .. string.format(
-                    "%s mismatch: expected=$s actual=%s;",
+                    "%s mismatch: expected=%s actual=%s;",
                     differenceItem.Field,
                     formatValue(differenceItem.Expected),
                     formatValue(differenceItem.Actual)
@@ -1220,4 +1323,5 @@ function ReplayController:ValidateSnapshot(replayResult, snapshot)
     return differenceReport.Valid, differenceReport.Summary, differenceReport
 end
 
+---@type MSD4RReplayController
 return ReplayController
