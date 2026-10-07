@@ -406,10 +406,9 @@ function MSD4R:OnExecuteCommand(command, params)
 
         Renderer.GlitchedItemRenderer:Reset()
         Utility.Log(
-            Renderer.GlitchedItemRenderer:WriteLog(
+            Renderer.GlitchedItemRenderer:GetLog(
                 itemID,
                 ProceduralSeedTracker:GetSeed(itemID),
-                nil,
                 {
                     RunSeed = ProceduralSeedTracker:GetCurrentRunSeed(),
                     SeedSources = seedSources

@@ -31,6 +31,8 @@ function GlitchedItemRenderer:Initialize()
         return true
     end
 
+    CoreAPI:Initialize()
+
     local renderingAvailable, missingAPIs =
         CoreAPI:CheckGlitchedRendering(Game())
 
@@ -124,7 +126,7 @@ function GlitchedItemRenderer:ProcessReplay(
     end
 
     if not CoreAPI:CheckProceduralItem(proceduralItem) then
-        processingResult.FailureReason = "Procedural item APIs are unavailable"
+        processingResult.FailureReason = "procedural item APIs are unavailable"
 
         return processingResult
     end
@@ -152,32 +154,39 @@ function GlitchedItemRenderer:ProcessReplay(
     )
 
     if self.CachedReplayResult[replayKey] then
-        processingResult.ReplayResult = self.CachedReplayResult[replayKey]
-        processingResult.Diagnostic = self.Diagnostics[replayKey]
+        processingResult.ReplayResult =
+            self.CachedReplayResult[replayKey]
+        processingResult.Diagnostic =
+            self.Diagnostics[replayKey]
 
         return processingResult
     end
 
     if self.CachedReplayFailureReason[replayKey] then
-        processingResult.FailureReason = self.CachedReplayFailureReason[replayKey]
-        processingResult.Diagnostic = self.Diagnostics[replayKey]
+        processingResult.FailureReason =
+            self.CachedReplayFailureReason[replayKey]
+        processingResult.Diagnostic =
+            self.Diagnostics[replayKey]
 
         return processingResult
     end
 
     local env = ReplayController:BuildEnvironment()
     local snapshot = ReplayController:GetSnapshot(proceduralItem)
+    ---@type MSD4RDiagnostic
     local diagnostic = {
         ItemID = itemID,
         Seeds = validSeeds,
         KnownFlags = knownFlags,
-        Candidates = {},
-        BestTryIndex = 0
+        DifferenceReports = {},
+        BestDifferenceReportIndex = 0
     }
-    local bestTryReport
-    local visitedSeeds = {}
 
     self.Diagnostics[replayKey] = diagnostic
+
+    ---@type MSD4RDifferenceReport?
+    local bestDifferenceReport
+    local visitedSeeds = {}
 
     for _, seed in ipairs(validSeeds) do
         for _, flags in ipairs(knownFlags) do
@@ -201,22 +210,29 @@ function GlitchedItemRenderer:ProcessReplay(
                     snapshot
                 )
 
-                report.ItemConfig.Seed = seed
-                report.ItemConfig.Flags = flags
-                report.ItemConfig.EffectiveSeed = effectiveSeed
-                report.ItemConfig.PreEffects = replayResult.PreEffects
-                report.ItemConfig.Effects = replayResult.Effects
-                report.ItemConfig.GraphicsState = replayResult.GraphicsState
-                report.ItemConfig.DevilPrice = replayResult.DevilPrice
-                report.ItemConfig.ShopPrice = replayResult.ShopPrice
-                diagnostic.Candidates[#diagnostic.Candidates + 1] = report
+                report.ItemConfig = {
+                    Seed = seed,
+                    Flags = flags,
+                    EffectiveSeed = effectiveSeed,
+                    PreEffects = replayResult.PreEffects,
+                    Effects = replayResult.Effects,
+                    GraphicsState = replayResult.GraphicsState,
+                    DevilPrice = replayResult.DevilPrice,
+                    ShopPrice = replayResult.ShopPrice
+                }
 
-                if not bestTryReport
-                    or report.PrefixMatchedCount > bestTryReport.PrefixMatchedCount
-                    or (report.PrefixMatchedCount == bestTryReport.PrefixMatchedCount
-                        and #report.Differences < #bestTryReport.Differences)
+                diagnostic.DifferenceReports[
+                #diagnostic.DifferenceReports + 1
+                ] = report
+
+                if not bestDifferenceReport
+                    or report.PrefixMatchedCount > bestDifferenceReport.PrefixMatchedCount
+                    or (report.PrefixMatchedCount == bestDifferenceReport.PrefixMatchedCount
+                        and #report.Differences < #bestDifferenceReport.Differences)
                 then
-                    bestTryReport = report
+                    bestDifferenceReport = report
+                    diagnostic.BestDifferenceReportIndex =
+                        #diagnostic.DifferenceReports
                 end
 
                 if valid then
@@ -225,7 +241,8 @@ function GlitchedItemRenderer:ProcessReplay(
                     self.CachedReplayResult[replayKey] = replayResult
                     processingResult.ReplayResult = replayResult
 
-                    diagnostic.BestTryIndex = #diagnostic.Candidates
+                    diagnostic.BestDifferenceReportIndex =
+                        #diagnostic.DifferenceReports
                     processingResult.Diagnostic = diagnostic
 
                     return processingResult
@@ -236,19 +253,13 @@ function GlitchedItemRenderer:ProcessReplay(
 
     local noValidSeedReason = "no seed matched"
 
-    if bestTryReport then
-        for i, diagnosticItem in ipairs(diagnostic.Candidates) do
-            if diagnosticItem == bestTryReport then
-                diagnostic.BestTryIndex = i
-            end
-        end
-
+    if bestDifferenceReport then
         noValidSeedReason = string.format(
-            "seed=%u flags=%d pre=%s: %s",
-            bestTryReport.ItemConfig.Seed,
-            bestTryReport.ItemConfig.Flags,
-            bestTryReport.IsPreEffectsMatched and "MATCH" or "DIFF",
-            bestTryReport.Summary
+            "seed=%u flags=%d pre-effects=%s: %s",
+            bestDifferenceReport.ItemConfig.Seed,
+            bestDifferenceReport.ItemConfig.Flags,
+            bestDifferenceReport.ArePreEffectsMatched and "MATCH" or "DIFF",
+            bestDifferenceReport.Summary
         )
     end
 
@@ -650,7 +661,8 @@ function GlitchedItemRenderer:RenderItemIcon(
         self.ProcessReplay,
         self,
         itemID,
-        seeds
+        seeds,
+        nil
     )
 
     if not resolveSuccessfully
@@ -748,13 +760,11 @@ end
 
 ---@param itemID integer
 ---@param seeds? integer[]
----@param knownFlags? integer[]
 ---@param context? MSD4RDiagnosticContext
 ---@return string result1
-function GlitchedItemRenderer:WriteLog(
+function GlitchedItemRenderer:GetLog(
     itemID,
     seeds,
-    knownFlags,
     context
 )
     local replaySuccessfully, resultOrError = pcall(
@@ -762,7 +772,7 @@ function GlitchedItemRenderer:WriteLog(
         self,
         itemID,
         seeds,
-        knownFlags
+        nil
     )
 
     if not replaySuccessfully
@@ -781,24 +791,29 @@ function GlitchedItemRenderer:WriteLog(
         }
 
         if resultOrError.Diagnostic then
-            for i, diagnosticItem in ipairs(resultOrError.Diagnostic.Candidates) do
+            for i, differenceReport in ipairs(resultOrError.Diagnostic.DifferenceReports) do
                 lines[#lines + 1] = string.format(
                     "%s seed=%u flags=%d effective-seed=%u pre-effects=%s matches=%d/%d: %s.",
-                    (i == resultOrError.Diagnostic.BestTryIndex) and "BEST" or "Candidate",
-                    diagnosticItem.ItemConfig.Seed,
-                    diagnosticItem.ItemConfig.Flags,
-                    diagnosticItem.ItemConfig.EffectiveSeed,
-                    diagnosticItem.IsPreEffectsMatched and "MATCH" or "DIFF",
-                    diagnosticItem.MatchedCount,
-                    diagnosticItem.Checks,
-                    diagnosticItem.Summary
+                    (i == resultOrError.Diagnostic.BestDifferenceReportIndex
+                        and "BEST-DIFF"
+                        or "DIFF"),
+                    differenceReport.ItemConfig.Seed,
+                    differenceReport.ItemConfig.Flags,
+                    differenceReport.ItemConfig.EffectiveSeed,
+                    differenceReport.ArePreEffectsMatched and "MATCH" or "DIFF",
+                    differenceReport.MatchedCount,
+                    differenceReport.Checks,
+                    differenceReport.Summary
                 )
             end
             writeSuccessfully = self:WriteDiagnostic(
                 resultOrError.Diagnostic,
                 context
             )
-            lines[#lines + 1] = "Write diagnostic to \"log.txt\": " .. tostring(writeSuccessfully) .. "."
+            lines[#lines + 1] = string.format(
+                "Write diagnostic to \"log.txt\": %s.",
+                tostring(writeSuccessfully)
+            )
         end
 
         return table.concat(lines, "\n")
@@ -808,7 +823,7 @@ function GlitchedItemRenderer:WriteLog(
 
     for i = 1, 4 do
         sourceItems[i] = tostring(
-            resultOrError.ReplayResult.SourceItems[i] or "nil"
+            resultOrError.ReplayResult.SourceItems[i] or "<nil>"
         )
     end
 
@@ -825,7 +840,10 @@ function GlitchedItemRenderer:WriteLog(
         #resultOrError.ReplayResult.Attempts,
         #resultOrError.ReplayResult.Effects,
         table.concat(sourceItems, ","),
-        "Write diagnostic to \"log.txt\": " .. tostring(writeSuccessfully) .. "."
+        string.format(
+            "Write diagnostic to \"log.txt\": %s.",
+            tostring(writeSuccessfully)
+        )
     )
 end
 

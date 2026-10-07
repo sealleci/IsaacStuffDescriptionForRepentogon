@@ -297,8 +297,7 @@ end
 ---@param player? EntityPlayer
 ---@return nil # No return value.
 function ProceduralSeedTracker:OnPreUseD4(rng, player)
-    if not ProceduralItemManager
-        or not player
+    if not player
         or not rng
     then
         return

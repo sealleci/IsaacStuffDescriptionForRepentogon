@@ -37,6 +37,7 @@ function PauseMenuController:Initialize(mod, renderer, proceduralSeedTracker)
     self.SelectedItemSlotIndex = 1
     self.FirstColumnNumber = 1
     self.SavedPauseMenuSelection = 0
+    self.LastRenderError = nil
 end
 
 ---@return nil # No return value.

@@ -1100,7 +1100,7 @@ function ReplayController:ValidateSnapshot(replayResult, snapshot)
         Checks = 0,
         MatchedCount = 0,
         PrefixMatchedCount = 0,
-        IsPreEffectsMatched = false,
+        ArePreEffectsMatched = false,
         Valid = false,
         Summary = ""
     }
@@ -1220,8 +1220,8 @@ function ReplayController:ValidateSnapshot(replayResult, snapshot)
         )
     end
 
-    differenceReport.IsPreEffectsMatched =
-        #differenceReport.Differences == 0
+    differenceReport.ArePreEffectsMatched =
+        (#differenceReport.Differences == 0)
     checkField(
         "EffectCount",
         #snapshot.Effects,
@@ -1313,7 +1313,7 @@ function ReplayController:ValidateSnapshot(replayResult, snapshot)
         for _, differenceItem in ipairs(differenceReport.Differences) do
             differenceReport.Summary = differenceReport.Summary
                 .. string.format(
-                    "%s mismatch: expected=%s actual=%s;",
+                    " %s mismatch: expected=%s actual=%s;",
                     differenceItem.Field,
                     formatValue(differenceItem.Expected),
                     formatValue(differenceItem.Actual)

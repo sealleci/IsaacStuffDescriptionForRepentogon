@@ -232,7 +232,7 @@ Project types use an MSD4R prefix to avoid collisions.
 ---@field Checks integer
 ---@field MatchedCount integer
 ---@field PrefixMatchedCount integer
----@field IsPreEffectsMatched boolean
+---@field ArePreEffectsMatched boolean
 ---@field Valid boolean
 ---@field Summary string
 
@@ -240,8 +240,8 @@ Project types use an MSD4R prefix to avoid collisions.
 ---@field ItemID integer
 ---@field Seeds integer[]
 ---@field KnownFlags integer[]
----@field Candidates MSD4RDifferenceReport[]
----@field BestTryIndex integer
+---@field DifferenceReports MSD4RDifferenceReport[]
+---@field BestDifferenceReportIndex integer
 
 ---@class MSD4RProcessingResult
 ---@field ReplayResult MSD4RReplayResult?

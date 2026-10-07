@@ -105,7 +105,6 @@ local CONFIG = {
         [PlayerType.PLAYER_JACOB_B] = 34,
         [PlayerType.PLAYER_JACOB2_B] = 34,
     },
-
     PLACEHOLDER_AVATAR_LAYER_ID = 35
 }
 
@@ -1019,10 +1018,11 @@ function Renderer:GetDescription(itemID, isTrinket)
             quality = 0
         end
 
-        descriptionBodyOrError.Name = descriptionBodyOrError.Name
-            .. " - {{Quality"
-            .. tostring(quality)
-            .. "}}"
+        descriptionBodyOrError.Name = string.format(
+            "%s - {{Quality%d}}",
+            descriptionBodyOrError.Name or "",
+            quality
+        )
     end
 
     return descriptionBodyOrError

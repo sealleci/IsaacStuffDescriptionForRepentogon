@@ -72,7 +72,10 @@ end
 
 ---@return nil # No return value.
 function ModSave:Load()
-    if not self.SaveAvailable or not self.Mod or not self.JsonCodec then
+    if not self.SaveAvailable
+        or not self.Mod
+        or not self.JsonCodec
+    then
         return
     end
 
@@ -124,6 +127,8 @@ end
 function ModSave:Initialize(mod)
     self.Mod = mod
     self.Data = self:CopyDefaults()
+
+    CoreAPI:Initialize()
 
     local saveAvailable, missingAPIs, jsonCodec =
         CoreAPI:CheckSave(mod)
