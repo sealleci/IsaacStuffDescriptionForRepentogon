@@ -12,13 +12,14 @@
 ---@field SavedPauseMenuSelection integer
 ---@field LastRenderError string?
 local PauseMenuController = {}
+
+---@type MSD4RUIConfig
+local UI_CONFIG = include("scripts/ui_config")
 ---@type MSD4RUtility
 local Utility = include("scripts/utility")
 
 ---@type Game
 local game = Game()
----@type MSD4RUIConfig
-local UI_CONFIG = include("scripts/ui_config")
 
 ---@param mod MSD4RMod
 ---@param renderer MSD4RRenderer

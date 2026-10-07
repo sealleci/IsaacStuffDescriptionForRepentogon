@@ -4,6 +4,9 @@
 ---@field ModSave MSD4RModSave
 local ModConfig = {}
 
+---@type MSD4RUtility
+local Utility = include("scripts/utility")
+
 ---@type MSD4RMenuInfo
 local MENU_INFO = {
     CATEGORY = "My Stuff Desc",
@@ -17,12 +20,6 @@ local MENU_INFO = {
         "White",
     }
 }
-
----@param value number
----@return integer result1
-function ModConfig:Round(value)
-    return math.floor(value + 0.5)
-end
 
 ---@return nil # No return value.
 function ModConfig:RegisterAppearanceSettings()
@@ -52,7 +49,7 @@ function ModConfig:RegisterAppearanceSettings()
             ---@param value number
             ---@return nil # No return value.
             OnChange = function(value)
-                self.ModSave:Set("IconBrightness", self:Round(value))
+                self.ModSave:Set("IconBrightness", Utility.Round(value))
             end,
             Info = {
                 "Adjusts brightness of item icons.",
@@ -79,7 +76,7 @@ function ModConfig:RegisterAppearanceSettings()
             ---@param value number
             ---@return nil # No return value.
             OnChange = function(value)
-                self.ModSave:Set("IconOutline", self:Round(value))
+                self.ModSave:Set("IconOutline", Utility.Round(value))
             end,
             Info = {
                 "Adds a contrast outline around item icons."
@@ -105,7 +102,7 @@ function ModConfig:RegisterAppearanceSettings()
             ---@param value number
             ---@return nil # No return value.
             OnChange = function(value)
-                self.ModSave:Set("OutlineColor", self:Round(value))
+                self.ModSave:Set("OutlineColor", Utility.Round(value))
             end,
             Info = {
                 "Changes color of outline around item icons."
@@ -140,7 +137,7 @@ function ModConfig:RegisterLayoutSettings()
             ---@param value number
             ---@return nil # No return value.
             OnChange = function(value)
-                self.ModSave:Set("OffsetX", ModConfig:Round(value))
+                self.ModSave:Set("OffsetX", Utility.Round(value))
             end,
             Info = {
                 "Adjusts content horizontally in screen pixels."
@@ -166,7 +163,7 @@ function ModConfig:RegisterLayoutSettings()
             ---@param value number
             ---@return nil # No return value.
             OnChange = function(value)
-                self.ModSave:Set("OffsetY", self:Round(value))
+                self.ModSave:Set("OffsetY", Utility.Round(value))
             end,
             Info = {
                 "Adjusts content vertically in screen pixels."

@@ -1,6 +1,3 @@
----@type MSD4RUtility
-local Utility = include("scripts/utility")
-
 ---@class MSD4RMod: ModReference
 ---@field Enabled boolean
 ---@field GlitchedRenderingAvailable boolean
@@ -10,6 +7,8 @@ local MSD4R = RegisterMod("My Stuff Descriptions for Repentogon", 1)
 
 ---@type MSD4RCoreAPI
 local CoreAPI = include("scripts/core_api")
+---@type MSD4RModConfig
+local ModConfig = include("scripts/mod_config")
 ---@type MSD4RModSave
 local ModSave = include("scripts/mod_save")
 ---@type MSD4RPauseMenuController
@@ -18,11 +17,11 @@ local PauseMenuController = include("scripts/pause_menu_controller")
 local ProceduralSeedTracker = include("scripts/procedural_seed_tracker")
 ---@type MSD4RRenderer
 local Renderer = include("scripts/renderer")
+---@type MSD4RUtility
+local Utility = include("scripts/utility")
 
 ---@type string
 local EID_MOD_ID = "836319872"
----@type MSD4RModConfig
-local ModConfig = include("scripts/mod_config")
 ---@type Game
 local game = Game()
 
@@ -99,6 +98,7 @@ function MSD4R:OnModsLoaded()
     ModSave:Initialize(self)
     ModConfig:Initialize(ModSave)
     Renderer:Initialize(self)
+
     self.GlitchedRenderingAvailable =
         Renderer.GlitchedItemRenderer.Initialized == true
 

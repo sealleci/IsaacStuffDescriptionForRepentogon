@@ -54,6 +54,12 @@ function Utility.SameFloat(value1, value2)
             == Utility.ConvertToF32(value2))
 end
 
+---@param value number
+---@return integer result1
+function Utility.Round(value)
+    return math.floor(value + 0.5)
+end
+
 ---@return integer result1
 function Utility.GetItemCount()
     return Isaac.GetItemConfig():GetCollectibles().Size
