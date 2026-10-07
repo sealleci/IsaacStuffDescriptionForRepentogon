@@ -20,8 +20,6 @@ local Renderer = include("scripts/renderer")
 ---@type MSD4RUtility
 local Utility = include("scripts/utility")
 
----@type string
-local EID_MOD_ID = "836319872"
 ---@type Game
 local game = Game()
 
@@ -77,17 +75,6 @@ function MSD4R:OnModsLoaded()
 
     if not coreAvailable then
         CoreAPI:ReportUnavailable("Core", missingAPIs)
-
-        return
-    end
-
-    local eidMetadata = XMLData.GetModById(EID_MOD_ID)
-
-    if not eidMetadata
-        or not EID
-    then
-        self.Enabled = false
-        Utility.Log("EID API is unavailable.")
 
         return
     end

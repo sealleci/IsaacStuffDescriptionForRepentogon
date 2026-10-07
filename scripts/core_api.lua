@@ -8,6 +8,7 @@ local Utility = include("scripts/utility")
 
 ---@type MSD4RCoreAPIConfig
 local CONFIG = {
+    EID_MOD_ID = "836319872",
     SPRITE_METHODS = {
         "Load",
         "Play",
@@ -142,12 +143,20 @@ function CoreAPI:CheckCore(mod, game, eid)
             "GetMyStuffSprite"
         }
     )
-    self:CheckMethods(
-        missingAPIs,
-        "XMLData",
-        XMLData,
-        { "GetModById" }
-    )
+
+    if self:CheckMethods(
+            missingAPIs,
+            "XMLData",
+            XMLData,
+            { "GetModById" }
+        ) then
+        local eidMetadata = XMLData.GetModById(CONFIG.EID_MOD_ID)
+
+        if not eidMetadata then
+            missingAPIs[#missingAPIs + 1] = "EID mod metadata"
+        end
+    end
+
     self:CheckMethods(
         missingAPIs,
         "Isaac",

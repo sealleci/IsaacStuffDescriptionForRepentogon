@@ -300,6 +300,7 @@ Project types use an MSD4R prefix to avoid collisions.
 ---@field PLACEHOLDER_AVATAR_LAYER_ID integer
 
 ---@class MSD4RCoreAPIConfig
+---@field EID_MOD_ID string
 ---@field SPRITE_METHODS string[]
 
 ---@alias MSD4RSavedSeeds table<string, integer[]|integer>
