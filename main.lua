@@ -91,8 +91,6 @@ function MSD4R:OnModsLoaded()
 
     if self.GlitchedRenderingAvailable then
         ProceduralSeedTracker:Initialize(self)
-    else
-        ProceduralSeedTracker:Clear()
     end
 
     PauseMenuController:Initialize(
@@ -395,7 +393,7 @@ function MSD4R:OnExecuteCommand(command, params)
         Utility.Log(
             Renderer.GlitchedItemRenderer:GetLog(
                 itemID,
-                ProceduralSeedTracker:GetSeed(itemID),
+                ProceduralSeedTracker:GetSeeds(itemID),
                 {
                     RunSeed = ProceduralSeedTracker:GetCurrentRunSeed(),
                     SeedSources = seedSources

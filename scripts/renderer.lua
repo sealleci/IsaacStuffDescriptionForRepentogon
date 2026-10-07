@@ -605,13 +605,13 @@ end
 ---@param itemID integer
 ---@param position Vector
 ---@param scale Vector
----@param proceduralSeed? integer[]
+---@param proceduralSeeds integer[]
 ---@return nil # No return value.
 function Renderer:RenderItemIcon(
     itemID,
     position,
     scale,
-    proceduralSeed
+    proceduralSeeds
 )
     ---@param renderPosition Vector
     ---@param color Color
@@ -623,7 +623,7 @@ function Renderer:RenderItemIcon(
         if currentItemID < 0 then
             renderedGlitchedItemIcon = GlitchedItemRenderer:RenderItemIcon(
                 currentItemID,
-                proceduralSeed,
+                proceduralSeeds,
                 renderPosition,
                 scale,
                 color
@@ -1132,7 +1132,7 @@ end
 
 ---@param pauseBody? Sprite
 ---@param playerType integer
----@param itemSlots? MSD4RItemSlot[]
+---@param itemSlots MSD4RItemSlot[]
 ---@param firstColumnNumber integer
 ---@param playerCount integer
 ---@return nil # No return value.
@@ -1148,9 +1148,7 @@ function Renderer:RenderMyStuffPage(
         self:RenderEmptyMyStuffPage(pauseBody)
     end
 
-    if not itemSlots
-        or #itemSlots < 1
-    then
+    if #itemSlots < 1 then
         return
     end
 
@@ -1180,12 +1178,11 @@ function Renderer:RenderMyStuffPage(
                 layout
             )
             if not itemSlot.IsTrinket then
-                ---@cast itemSlot MSD4RCollectibleSlot
                 self:RenderItemIcon(
                     itemSlot.ID,
                     position,
                     layout.ItemScale,
-                    itemSlot.ProceduralSeed
+                    itemSlot.ProceduralSeeds
                 )
             else
                 self:RenderTrinketIcon(

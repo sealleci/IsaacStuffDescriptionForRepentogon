@@ -23,19 +23,11 @@ Project types use an MSD4R prefix to avoid collisions.
 ---@field encode fun(value: any): string
 ---@field decode fun(text: string): any
 
----@class MSD4RCollectibleSlot
----@field ID integer
----@field IsTrinket false
+---@class MSD4RItemSlot
+---@field ID TrinketType | CollectibleType
+---@field IsTrinket boolean
 ---@field Index integer
----@field ProceduralSeed integer[]?
-
----@class MSD4RTrinketSlot
----@field ID integer
----@field IsTrinket true
----@field Index integer
----@field ProceduralSeed integer[]|integer|nil
-
----@alias MSD4RItemSlot MSD4RCollectibleSlot|MSD4RTrinketSlot
+---@field ProceduralSeeds integer[]
 
 ---@class MSD4RHiddenLayer
 ---@field SpriteName "PauseMenu"|"PauseStats"
@@ -83,7 +75,7 @@ Project types use an MSD4R prefix to avoid collisions.
 ---@field Seed integer
 ---@field Shift integer
 ---@field Count integer
----@field Run integer
+---@field RunSeed integer
 ---@field Frame integer
 ---@field Player EntityPlayer
 

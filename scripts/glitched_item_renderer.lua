@@ -630,7 +630,7 @@ function GlitchedItemRenderer:BakeGlitchedItemIcon(replayResult)
 end
 
 ---@param itemID integer
----@param seeds? integer[]
+---@param seeds integer[]
 ---@param position Vector
 ---@param scale? Vector
 ---@param color? Color
@@ -643,7 +643,6 @@ function GlitchedItemRenderer:RenderItemIcon(
     color
 )
     if not self.Initialized
-        or not seeds
         or not CoreAPI:CheckGlitchedImage(self.ItemIconsImage)
     then
         return false

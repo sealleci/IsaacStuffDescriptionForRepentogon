@@ -98,6 +98,7 @@ end
 ---@param playerIndex integer
 ---@return MSD4RItemSlot[] result1
 function PauseMenuController:GetSinglePlayerItemSlots(playerIndex)
+    ---@type MSD4RItemSlot[]
     local itemSlots = {}
     local itemIndex = 1
 
@@ -109,15 +110,18 @@ function PauseMenuController:GetSinglePlayerItemSlots(playerIndex)
     -- Add held trinkets to the beginning of the list
     for i = 0, player:GetMaxTrinkets() - 1 do
         local heldTrinketID = player:GetTrinket(i)
+        ---@type MSD4RItemSlot
+        local trinketSlot = {
+            ID = heldTrinketID,
+            IsTrinket = true,
+            Index = itemIndex,
+            ProceduralSeeds = { 0 }
+        }
+
         if heldTrinketID ~= TrinketType.TRINKET_NULL then
             table.insert(
                 itemSlots,
-                {
-                    ID = heldTrinketID,
-                    IsTrinket = true,
-                    Index = itemIndex,
-                    ProceduralSeed = 0
-                }
+                trinketSlot
             )
             itemIndex = itemIndex + 1
         end
@@ -127,16 +131,18 @@ function PauseMenuController:GetSinglePlayerItemSlots(playerIndex)
     for i = #history, 1, -1 do
         local historyItem = history[i]
         local itemID = historyItem:GetItemID()
-        local proceduralSeed = self.ProceduralSeedTracker:GetSeed(itemID)
+        local proceduralSeeds = self.ProceduralSeedTracker:GetSeeds(itemID)
+        ---@type MSD4RItemSlot
+        local itemSlot = {
+            ID = itemID,
+            IsTrinket = historyItem:IsTrinket(),
+            Index = itemIndex,
+            ProceduralSeeds = proceduralSeeds
+        }
 
         table.insert(
             itemSlots,
-            {
-                ID = itemID,
-                IsTrinket = historyItem:IsTrinket(),
-                Index = itemIndex,
-                ProceduralSeed = proceduralSeed
-            }
+            itemSlot
         )
         itemIndex = itemIndex + 1
     end

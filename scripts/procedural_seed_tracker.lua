@@ -64,8 +64,8 @@ function ProceduralSeedTracker:Initialize(mod)
     self.ModSave = mod.ModSave
     self.RunSeed = self:NormalizeSeed(self.ModSave:GetRunSeed())
     self.ItemIDToSeeds = {}
-    self.SeedSources = {}
     self.PendingSeeds = {}
+    self.SeedSources = {}
     self.RerollWindows = {}
 
     self:UpdateProceduralSeeds()
@@ -101,19 +101,20 @@ function ProceduralSeedTracker:Save()
 end
 
 ---@param id integer
----@return integer[]? result1
-function ProceduralSeedTracker:GetSeed(id)
+---@return integer[] result1
+function ProceduralSeedTracker:GetSeeds(id)
     id = Utility.ConvertToID32(id)
+
+    local candidateSeeds = {}
+    local visitedSeeds = {}
 
     local itemProceduralSeeds = self.ItemIDToSeeds[id]
     if not itemProceduralSeeds
         or #itemProceduralSeeds < 1
     then
-        return nil
+        return candidateSeeds
     end
 
-    local candidateSeeds = {}
-    local visitedSeeds = {}
     for _, seed in ipairs(itemProceduralSeeds) do
         if not visitedSeeds[seed] then
             candidateSeeds[#candidateSeeds + 1] = seed
@@ -201,8 +202,8 @@ function ProceduralSeedTracker:SetSeed(id, seed, source)
     if self.RunSeed ~= runSeed then
         self.RunSeed = runSeed
         self.ItemIDToSeeds = {}
-        self.SeedSources = {}
         self.PendingSeeds = {}
+        self.SeedSources = {}
     end
 
     if not self.SeedSources[id] then
@@ -306,14 +307,16 @@ function ProceduralSeedTracker:OnPreUseD4(rng, player)
     local shift = rng:GetShiftIdx()
     if not shift then
         Isaac.DebugString("[MSD4R] D4 RNG shift index is unavailable.\n")
+
         return
     end
 
+    ---@type MSD4RRerollWindow
     local window = {
         Seed = rng:GetSeed(),
         Shift = shift,
         Count = ProceduralItemManager.GetProceduralItemCount(),
-        Run = self:GetCurrentRunSeed(),
+        RunSeed = self:GetCurrentRunSeed(),
         Frame = game:GetFrameCount(),
         Player = player
     }
@@ -338,8 +341,10 @@ function ProceduralSeedTracker:MatchCreationSeeds(
     lastIndex,
     seeds
 )
-    local pendingItems = {}
+    ---@type MSD4RMatchedSeed[]
     local matchedSeeds = {}
+    ---@type MSD4RPendingItem[]
+    local pendingItems = {}
 
     for index = firstIndex, lastIndex - 1 do
         local id = -index - 1
@@ -394,7 +399,7 @@ end
 ---@param rng RNG
 ---@return nil # No return value.
 function ProceduralSeedTracker:FinishD4(window, rng)
-    if window.Run ~= self:GetCurrentRunSeed() then
+    if window.RunSeed ~= self:GetCurrentRunSeed() then
         return
     end
 
@@ -432,8 +437,8 @@ function ProceduralSeedTracker:FinishD4(window, rng)
         )
     end
 
-    Isaac.DebugString(string.format(
-        "D4 captured=%d/%d rngSteps=%d ids=%d..%d",
+    Isaac.ConsoleOutput(string.format(
+        "D4 captured=%d/%d rngSteps=%d ids=%d/%d.",
         #matchResult,
         count - window.Count,
         #seeds,
@@ -454,6 +459,7 @@ function ProceduralSeedTracker:OnPostUseD4(rng, player)
         return
     end
 
+    ---@type MSD4RRerollWindow
     local window = table.remove(self.RerollWindows[key])
 
     self:FinishD4(window, rng)
@@ -468,7 +474,7 @@ function ProceduralSeedTracker:OnRerollUpdate()
     for _, stack in pairs(windows) do
         for i = #stack, 1, -1 do
             local window = stack[i]
-            if window.Run == self:GetCurrentRunSeed()
+            if window.RunSeed == self:GetCurrentRunSeed()
                 and window.Player:Exists()
             then
                 self:FinishD4(
@@ -480,14 +486,6 @@ function ProceduralSeedTracker:OnRerollUpdate()
             end
         end
     end
-end
-
----@return nil # No return value.
-function ProceduralSeedTracker:Clear()
-    self.ItemIDToSeeds = {}
-    self.SeedSources = {}
-    self.PendingSeeds = {}
-    self.RerollWindows = {}
 end
 
 ---@param isContinued boolean
