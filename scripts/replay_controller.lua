@@ -1190,10 +1190,10 @@ function ReplayController:ValidateSnapshot(replayResult, snapshot)
         false
     )
 
-    for i, k in ipairs(CONFIG.HEALTH_METHODS) do
+    for i, key in ipairs(CONFIG.HEALTH_METHODS) do
         checkField(
-            k,
-            snapshotItem[k],
+            key,
+            snapshotItem[key],
             replayResult.PreEffects.Health[i],
             false,
             false
