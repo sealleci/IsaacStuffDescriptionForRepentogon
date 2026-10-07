@@ -654,9 +654,7 @@ function Renderer:RenderItemIcon(
         outlineOffsets = CONFIG.FULL_OUTLINE_OFFSETS
     end
 
-    if outlineOffsets
-        and itemID > 0
-    then
+    if outlineOffsets then
         for _, offset in ipairs(outlineOffsets) do
             renderConditionally(
                 position + offset,

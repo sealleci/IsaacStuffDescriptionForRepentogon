@@ -411,7 +411,6 @@ function MSD4R:OnExecuteCommand(command, params)
                 ProceduralSeedTracker:GetSeed(itemID),
                 nil,
                 {
-                    Kind = 'existing-item',
                     RunSeed = ProceduralSeedTracker:GetCurrentRunSeed(),
                     SeedSources = seedSources
                 }

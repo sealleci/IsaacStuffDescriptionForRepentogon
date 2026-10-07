@@ -880,7 +880,8 @@ function ReplayController:Replay(
         ShopPrice = shopPrice,
         Recipe = recipe,
         SourceItems = sourceItems,
-        Hue = hue
+        Hue = hue,
+        IconImage = nil
     }
 end
 

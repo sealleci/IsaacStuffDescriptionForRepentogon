@@ -14,7 +14,6 @@ local CONFIG = {
         "SetFrame",
         "GetAnimation",
         "GetLayer",
-        "GetFilename",
         "GetAllLayers",
         "GetAnimationData",
         "GetLayerFrameData",
@@ -443,12 +442,6 @@ function CoreAPI:InspectCoreRuntime(
                                 }
                             )
                         end
-                    else
-                        missingAPIs[#missingAPIs + 1] = string.format(
-                            "[%s]%s animation",
-                            sprite:GetFilename(),
-                            layer:GetName()
-                        )
                     end
                 end
             end

@@ -224,9 +224,9 @@ function GlitchedItemRenderer:ProcessReplay(
 
                     self.CachedReplayResult[replayKey] = replayResult
                     processingResult.ReplayResult = replayResult
-                    processingResult.Diagnostic = diagnostic
 
                     diagnostic.BestTryIndex = #diagnostic.Candidates
+                    processingResult.Diagnostic = diagnostic
 
                     return processingResult
                 end
@@ -271,14 +271,17 @@ function GlitchedItemRenderer:AdjustItemID(itemID)
     -- There are placeholders in "death items.png".
     local adjustedItemID = itemID
 
+    -- The passive version of The Book of Belial granted when obtaining Birthright as Judas.
+    if itemID == 59 then
+        return 34
+    end
+
     if itemID > 360 then
         adjustedItemID = adjustedItemID + 1
     end
-
     if itemID > 396 then
         adjustedItemID = adjustedItemID + 3
     end
-
     if itemID > 552 then
         adjustedItemID = adjustedItemID + 4
     end
@@ -455,8 +458,8 @@ end
 ---@param replayResult MSD4RReplayResult
 ---@return Image? result1
 function GlitchedItemRenderer:BakeGlitchedItemIcon(replayResult)
-    if replayResult.Image then
-        return replayResult.Image
+    if replayResult.IconImage then
+        return replayResult.IconImage
     end
 
     local quads = {}
@@ -564,7 +567,7 @@ function GlitchedItemRenderer:BakeGlitchedItemIcon(replayResult)
         return nil
     end
 
-    local renderSuccessfully, imageOrError = pcall(
+    local renderSuccessfully, iconImageOrError = pcall(
     ---@return Image result1
         function()
             local imageName = string.format(
@@ -605,12 +608,12 @@ function GlitchedItemRenderer:BakeGlitchedItemIcon(replayResult)
     )
 
     if renderSuccessfully then
-        replayResult.Image = imageOrError
+        replayResult.IconImage = iconImageOrError
 
-        return imageOrError
+        return iconImageOrError
     end
 
-    Utility.Log("Failed to bake glitched icon: " .. tostring(imageOrError) .. ".")
+    Utility.Log("Failed to bake glitched icon: " .. tostring(iconImageOrError) .. ".")
 
     return nil
 end
@@ -712,7 +715,6 @@ function GlitchedItemRenderer:WriteDiagnostic(diagnostic, context)
             local encodedReport = require("json").encode({
                 Schema = 2,
                 Diagnostic = diagnostic,
-                Context = context or {},
                 Environment = ReplayController:BuildEnvironment()
             })
 

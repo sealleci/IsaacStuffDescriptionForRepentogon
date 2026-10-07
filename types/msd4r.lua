@@ -187,7 +187,7 @@ Project types use an MSD4R prefix to avoid collisions.
 ---@field Recipe MSD4RRecipeTile[]
 ---@field SourceItems table<integer, integer>
 ---@field Hue number
----@field Image Image?
+---@field IconImage Image?
 
 ---@class MSD4RSnapshotItem
 ---@field ID integer
@@ -249,7 +249,6 @@ Project types use an MSD4R prefix to avoid collisions.
 ---@field Diagnostic MSD4RDiagnostic?
 
 ---@class MSD4RDiagnosticContext
----@field Kind string?
 ---@field RunSeed integer?
 ---@field SeedSources table<string, string[]>?
 
