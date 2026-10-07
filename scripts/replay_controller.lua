@@ -1108,8 +1108,8 @@ function ReplayController:ValidateSnapshot(replayResult, snapshot)
     ---@param field string
     ---@param actualValue any
     ---@param expectedValue any
-    ---@param isFloat boolean
-    ---@param isEntity boolean
+    ---@param isFloat boolean?
+    ---@param isEntity boolean?
     ---@return nil # No return value.
     local function checkField(
         field,
@@ -1171,32 +1171,24 @@ function ReplayController:ValidateSnapshot(replayResult, snapshot)
     checkField(
         "Type",
         snapshotItem.Type,
-        replayResult.PreEffects.ItemType,
-        false,
-        false
+        replayResult.PreEffects.ItemType
     )
     checkField(
         "MaxCharges",
         snapshotItem.MaxCharges,
-        replayResult.PreEffects.MaxCharges,
-        false,
-        false
+        replayResult.PreEffects.MaxCharges
     )
     checkField(
         "ChargeType",
         snapshotItem.ChargeType,
-        replayResult.PreEffects.ChargeType,
-        false,
-        false
+        replayResult.PreEffects.ChargeType
     )
 
     for i, key in ipairs(CONFIG.HEALTH_METHODS) do
         checkField(
             key,
             snapshotItem[key],
-            replayResult.PreEffects.Health[i],
-            false,
-            false
+            replayResult.PreEffects.Health[i]
         )
     end
 
@@ -1204,9 +1196,7 @@ function ReplayController:ValidateSnapshot(replayResult, snapshot)
         checkField(
             "TargetID",
             snapshot.TargetID,
-            replayResult.PreEffects.TargetID,
-            false,
-            false
+            replayResult.PreEffects.TargetID
         )
     end
 
@@ -1215,8 +1205,7 @@ function ReplayController:ValidateSnapshot(replayResult, snapshot)
             key,
             snapshot.Stats[i],
             replayResult.PreEffects.Stats[i],
-            true,
-            false
+            true
         )
     end
 
@@ -1225,9 +1214,7 @@ function ReplayController:ValidateSnapshot(replayResult, snapshot)
     checkField(
         "EffectCount",
         #snapshot.Effects,
-        #replayResult.Effects,
-        false,
-        false
+        #replayResult.Effects
     )
 
     for i, replayEffect in ipairs(replayResult.Effects) do
@@ -1241,23 +1228,18 @@ function ReplayController:ValidateSnapshot(replayResult, snapshot)
             checkField(
                 prefix .. "ConditionType",
                 snapshotEffect.ConditionType,
-                replayEffect.ConditionType,
-                false,
-                false
+                replayEffect.ConditionType
             )
             checkField(
                 prefix .. "ActionType",
                 snapshotEffect.ActionType,
-                replayEffect.ActionType,
-                false,
-                false
+                replayEffect.ActionType
             )
             checkField(
                 prefix .. "Score",
                 snapshotEffect.Score,
                 replayEffect.Score,
-                true,
-                false
+                true
             )
             if replayEffect.ConditionType == 6
                 and snapshotEffect.ConditionType == 6
@@ -1295,16 +1277,12 @@ function ReplayController:ValidateSnapshot(replayResult, snapshot)
     checkField(
         "DevilPrice",
         snapshotItem.DevilPrice,
-        replayResult.DevilPrice,
-        false,
-        false
+        replayResult.DevilPrice
     )
     checkField(
         "ShopPrice",
         snapshotItem.ShopPrice,
-        replayResult.ShopPrice,
-        false,
-        false
+        replayResult.ShopPrice
     )
 
     differenceReport.Valid =
