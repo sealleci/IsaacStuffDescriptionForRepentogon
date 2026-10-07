@@ -1108,8 +1108,8 @@ function ReplayController:ValidateSnapshot(replayResult, snapshot)
     ---@param field string
     ---@param actualValue any
     ---@param expectedValue any
-    ---@param isFloat? boolean
-    ---@param isEntity boolean|integer|nil
+    ---@param isFloat boolean
+    ---@param isEntity boolean
     ---@return nil # No return value.
     local function checkField(
         field,
@@ -1276,7 +1276,6 @@ function ReplayController:ValidateSnapshot(replayResult, snapshot)
             if snapshotEffect.ActionType == replayEffect.ActionType then
                 for _, key in ipairs(CONFIG.ACTION_FIELDS) do
                     local property = replayEffect.ActionProperty[key]
-
                     if property then
                         checkField(
                             prefix .. "Action." .. key,
@@ -1284,8 +1283,8 @@ function ReplayController:ValidateSnapshot(replayResult, snapshot)
                             property,
                             (key == "radius"
                                 or key == "damage"),
-                            (key:lower():find("type")
-                                or key:lower():find("variant"))
+                            (key:lower():find("type") ~= nil
+                                or key:lower():find("variant") ~= nil)
                         )
                     end
                 end
@@ -1296,13 +1295,18 @@ function ReplayController:ValidateSnapshot(replayResult, snapshot)
     checkField(
         "DevilPrice",
         snapshotItem.DevilPrice,
-        replayResult.DevilPrice
+        replayResult.DevilPrice,
+        false,
+        false
     )
     checkField(
         "ShopPrice",
         snapshotItem.ShopPrice,
-        replayResult.ShopPrice
+        replayResult.ShopPrice,
+        false,
+        false
     )
+
     differenceReport.Valid =
         #differenceReport.Differences == 0
     differenceReport.Summary = "MATCHED"
