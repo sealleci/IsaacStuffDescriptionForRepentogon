@@ -121,6 +121,10 @@ function MSD4R:OnPrePauseScreenRender(
         return
     end
 
+    if self.GlitchedRenderingAvailable then
+        ProceduralSeedTracker:OnRerollUpdate()
+    end
+
     PauseMenuController:OnPrePauseScreenRender(
         pauseBody,
         pauseStats
@@ -267,50 +271,64 @@ MSD4R:RegisterAvailableCallback(
     MSD4R.OnPostGetCollectible
 )
 
----@param item integer
+---@param itemID integer
 ---@param rng RNG
 ---@param player EntityPlayer
 ---@return nil # No return value.
-function MSD4R:OnPreUseItem(item, rng, player)
-    if not self.Enabled or
-        not self.GlitchedRenderingAvailable
+function MSD4R:OnPreUseItem(
+    itemID,
+    rng,
+    player
+)
+    if not self.Enabled
+        or not self.GlitchedRenderingAvailable
     then
         return
     end
 
-    ProceduralSeedTracker:OnPreUseD4(rng, player)
+    ProceduralSeedTracker:OnPreUseItem(
+        itemID,
+        rng,
+        player
+    )
 end
 
 MSD4R:RegisterAvailableCallback(
     ModCallbacks.MC_PRE_USE_ITEM,
-    MSD4R.OnPreUseItem,
-    CollectibleType.COLLECTIBLE_D4
+    MSD4R.OnPreUseItem
 )
 
----@param item integer
+---@param itemID integer
 ---@param rng RNG
 ---@param player EntityPlayer
 ---@return nil # No return value.
-function MSD4R:OnPostUseItem(item, rng, player)
-    if not self.Enabled or
-        not self.GlitchedRenderingAvailable
+function MSD4R:OnPostUseItem(
+    itemID,
+    rng,
+    player
+)
+    if not self.Enabled
+        or not self.GlitchedRenderingAvailable
     then
         return
     end
 
-    ProceduralSeedTracker:OnPostUseD4(rng, player)
+    ProceduralSeedTracker:OnPostUseItem(
+        itemID,
+        rng,
+        player
+    )
 end
 
 MSD4R:RegisterAvailableCallback(
     ModCallbacks.MC_POST_USE_ITEM,
-    MSD4R.OnPostUseItem,
-    CollectibleType.COLLECTIBLE_D4
+    MSD4R.OnPostUseItem
 )
 
 ---@return nil # No return value.
-function MSD4R:OnPostUpdate()
-    if not self.Enabled or
-        not self.GlitchedRenderingAvailable
+function MSD4R:OnSeedTrackingUpdate()
+    if not self.Enabled
+        or not self.GlitchedRenderingAvailable
     then
         return
     end
@@ -318,12 +336,114 @@ function MSD4R:OnPostUpdate()
     ProceduralSeedTracker:OnRerollUpdate()
 end
 
-if not ModCallbacks.MC_POST_USE_ITEM then
-    MSD4R:RegisterAvailableCallback(
-        ModCallbacks.MC_POST_UPDATE,
-        MSD4R.OnPostUpdate
+MSD4R:RegisterAvailableCallback(
+    ModCallbacks.MC_PRE_UPDATE,
+    MSD4R.OnSeedTrackingUpdate
+)
+
+MSD4R:RegisterAvailableCallback(
+    ModCallbacks.MC_POST_UPDATE,
+    MSD4R.OnSeedTrackingUpdate
+)
+
+---@param player EntityPlayer
+---@return nil # No return value.
+function MSD4R:OnPrePlayerTakeDamage(player)
+    if not self.Enabled
+        or not self.GlitchedRenderingAvailable
+    then
+        return
+    end
+
+    ProceduralSeedTracker:OnBeforeReroll(player)
+end
+
+MSD4R:RegisterAvailableCallback(
+    ModCallbacks.MC_PRE_PLAYER_TAKE_DMG,
+    MSD4R.OnPrePlayerTakeDamage
+)
+
+---@param cardID integer
+---@param player EntityPlayer
+---@return nil # No return value.
+function MSD4R:OnPreUseCard(
+    cardID,
+    player
+)
+    if not self.Enabled
+        or not self.GlitchedRenderingAvailable
+    then
+        return
+    end
+
+    ProceduralSeedTracker:OnBeforeReroll(player)
+end
+
+MSD4R:RegisterAvailableCallback(
+    ModCallbacks.MC_PRE_USE_CARD,
+    MSD4R.OnPreUseCard
+)
+
+---@param player EntityPlayer
+---@return nil # No return value.
+function MSD4R:OnPostPlayerInit(player)
+    if not self.Enabled
+        or not self.GlitchedRenderingAvailable
+    then
+        return
+    end
+
+    ProceduralSeedTracker:ObservePlayer(player)
+end
+
+MSD4R:RegisterAvailableCallback(
+    ModCallbacks.MC_POST_PLAYER_INIT,
+    MSD4R.OnPostPlayerInit
+)
+
+---@param pickup EntityPickup
+---@param entityType integer
+---@param variant integer
+---@return nil # No return value.
+function MSD4R:OnPrePickupMorph(
+    pickup,
+    entityType,
+    variant
+)
+    if not self.Enabled
+        or not self.GlitchedRenderingAvailable
+    then
+        return
+    end
+
+    ProceduralSeedTracker:OnPrePickupMorph(
+        pickup,
+        entityType,
+        variant
     )
 end
+
+MSD4R:RegisterAvailableCallback(
+    ModCallbacks.MC_PRE_PICKUP_MORPH,
+    MSD4R.OnPrePickupMorph
+)
+
+---@param pickup EntityPickup
+---@return nil # No return value.
+function MSD4R:OnPostPickupMorph(pickup)
+    if not self.Enabled
+        or not self.GlitchedRenderingAvailable
+    then
+        return
+    end
+
+    ProceduralSeedTracker:OnPostPickupMorph(pickup)
+end
+
+MSD4R:RegisterAvailableCallback(
+    ModCallbacks.MC_POST_PICKUP_MORPH,
+    MSD4R.OnPostPickupMorph
+)
 
 ---@param isContinued boolean
 ---@return nil # No return value.
@@ -370,6 +490,8 @@ function MSD4R:OnExecuteCommand(command, params)
     end
 
     if command == "msd4r_tm" then
+        ProceduralSeedTracker:OnRerollUpdate()
+
         local itemID = params:match("^%s*(-?%d+)%s*$")
         itemID = tonumber(itemID)
 

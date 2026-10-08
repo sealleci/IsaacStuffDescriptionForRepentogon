@@ -97,7 +97,7 @@ end
 
 ---@param itemID integer
 ---@param seeds integer[]
----@param knownFlags? integer[]
+---@param knownFlags integer[]
 ---@return MSD4RProcessingResult result1
 function GlitchedItemRenderer:ProcessReplay(
     itemID,
@@ -112,7 +112,7 @@ function GlitchedItemRenderer:ProcessReplay(
 
     itemID = Utility.ConvertToID32(itemID)
 
-    if not knownFlags then
+    if #knownFlags == 0 then
         knownFlags = { 0, 2, 8 }
     end
 
@@ -661,7 +661,7 @@ function GlitchedItemRenderer:RenderItemIcon(
         self,
         itemID,
         seeds,
-        nil
+        {}
     )
 
     if not resolveSuccessfully
@@ -758,7 +758,7 @@ function GlitchedItemRenderer:WriteDiagnostic(diagnostic, context)
 end
 
 ---@param itemID integer
----@param seeds? integer[]
+---@param seeds integer[]
 ---@param context? MSD4RDiagnosticContext
 ---@return string result1
 function GlitchedItemRenderer:GetLog(
@@ -771,7 +771,7 @@ function GlitchedItemRenderer:GetLog(
         self,
         itemID,
         seeds,
-        nil
+        {}
     )
 
     if not replaySuccessfully

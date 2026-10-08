@@ -25,7 +25,11 @@ local game = Game()
 ---@param renderer MSD4RRenderer
 ---@param proceduralSeedTracker MSD4RProceduralSeedTracker
 ---@return nil # No return value.
-function PauseMenuController:Initialize(mod, renderer, proceduralSeedTracker)
+function PauseMenuController:Initialize(
+    mod,
+    renderer,
+    proceduralSeedTracker
+)
     self.Mod = mod
     self.Renderer = renderer
     self.ProceduralSeedTracker = proceduralSeedTracker

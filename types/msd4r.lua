@@ -71,13 +71,30 @@ Project types use an MSD4R prefix to avoid collisions.
 ---@field renderString fun(self: MSD4REID, text: string, position: Vector, scale: Vector, color: KColor)
 ---@field printBulletPoints fun(self: MSD4REID, text: string, position: Vector, ignoreBulletPointIconConfig: boolean?)
 
----@class MSD4RRerollWindow
+---@class MSD4RSeedTrackerConfig
+---@field MAX_RNG_STEPS integer
+---@field MAX_SEEDS_PER_ITEM integer
+---@field CANDIDATE_FLAGS integer[]
+---@field SELECTION_SEED_STEPS integer
+---@field ACTIVE_OBSERVATION_FRAMES integer
+
+---@class MSD4RSeedRNGSnapshot
 ---@field Seed integer
 ---@field Shift integer
 ---@field Count integer
 ---@field RunSeed integer
----@field Frame integer
+
+---@class MSD4RPlayerRNGObservation
 ---@field Player EntityPlayer
+---@field Snapshots table<integer, MSD4RSeedRNGSnapshot>
+---@field LastUsedFrames table<integer, integer>
+
+---@class MSD4RPickupRNGObservation
+---@field Pickup EntityPickup
+---@field Snapshot MSD4RSeedRNGSnapshot?
+---@field ItemID integer?
+---@field DropSeed integer?
+---@field RNGSeed integer?
 
 ---@class MSD4RMatchedSeed
 ---@field ID integer
@@ -213,7 +230,7 @@ Project types use an MSD4R prefix to avoid collisions.
 ---@field Flags integer?
 ---@field EffectiveSeed integer?
 ---@field PreEffects MSD4RPreEffects?
----@field Effects MSD4RReplayEffect[]?
+---@field Effects MSD4RReplayEffect[]
 ---@field GraphicsState integer?
 ---@field DevilPrice integer?
 ---@field ShopPrice integer?

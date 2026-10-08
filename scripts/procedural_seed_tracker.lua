@@ -4,7 +4,14 @@
 ---@field ItemIDToSeeds MSD4RSeedMap
 ---@field SeedSources MSD4RSeedSourceMap
 ---@field PendingSeeds MSD4RSeedMap
----@field RerollWindows table<integer, MSD4RRerollWindow[]>
+---@field RerollWindows table<integer, MSD4RPlayerRNGObservation>
+---@field PickupWindows table<integer, MSD4RPickupRNGObservation>
+---@field ValidatedSeeds table<integer, integer>
+---@field TrackingRunSeed integer?
+---@field ObservedCount integer?
+---@field LastReplayError string?
+---@field ReportedAPIErrors table<string, boolean>
+---@field Initialized boolean?
 local ProceduralSeedTracker = {}
 
 ---@type MSD4RMagicConstants
@@ -13,6 +20,18 @@ local MAGIC_CONST = include("scripts/magic_const")
 local ReplayController = include("scripts/replay_controller")
 ---@type MSD4RUtility
 local Utility = include("scripts/utility")
+
+---@type MSD4RCoreAPI
+local CoreAPI = include("scripts/core_api")
+
+---@type MSD4RSeedTrackerConfig
+local CONFIG = {
+    MAX_RNG_STEPS = 16384,
+    MAX_SEEDS_PER_ITEM = 8,
+    CANDIDATE_FLAGS = { 0, 8 },
+    SELECTION_SEED_STEPS = 2,
+    ACTIVE_OBSERVATION_FRAMES = 1
+}
 
 ---@type Game
 local game = Game()
@@ -61,14 +80,45 @@ end
 ---@param mod MSD4RMod
 ---@return nil # No return value.
 function ProceduralSeedTracker:Initialize(mod)
+    if self.Initialized then
+        return
+    end
+
     self.ModSave = mod.ModSave
     self.RunSeed = self:NormalizeSeed(self.ModSave:GetRunSeed())
     self.ItemIDToSeeds = {}
     self.PendingSeeds = {}
     self.SeedSources = {}
+
     self.RerollWindows = {}
+    self.PickupWindows = {}
+    self.ValidatedSeeds = {}
+    self.TrackingRunSeed = nil
+    self.ObservedCount = nil
+    self.LastReplayError = nil
+    self.ReportedAPIErrors = {}
 
     self:UpdateProceduralSeeds()
+    self.Initialized = true
+end
+
+---@return nil # No return value.
+function ProceduralSeedTracker:ResetObservations()
+    self.RerollWindows = {}
+    self.PickupWindows = {}
+    self.ValidatedSeeds = {}
+    self.TrackingRunSeed = nil
+    self.ObservedCount = nil
+    self.LastReplayError = nil
+    self.ReportedAPIErrors = {}
+end
+
+---@return nil # No return value.
+function ProceduralSeedTracker:Clear()
+    self.ItemIDToSeeds = {}
+    self.SeedSources = {}
+    self.PendingSeeds = {}
+    self:ResetObservations()
 end
 
 ---@return integer result1
@@ -103,6 +153,10 @@ end
 ---@param id integer
 ---@return integer[] result1
 function ProceduralSeedTracker:GetSeeds(id)
+    if not self.Initialized then
+        return {}
+    end
+
     id = Utility.ConvertToID32(id)
 
     local candidateSeeds = {}
@@ -126,7 +180,7 @@ function ProceduralSeedTracker:GetSeeds(id)
         self.SeedSources[id] = {}
     end
 
-    for steps = 1, 2 do
+    for steps = 1, CONFIG.SELECTION_SEED_STEPS do
         for _, seed in ipairs(itemProceduralSeeds) do
             local curSeed = seed
             for _ = 1, steps do
@@ -159,8 +213,14 @@ end
 ---@param id integer
 ---@param seed integer
 ---@param source? string
+---@param deferSave? boolean
 ---@return nil # No return value.
-function ProceduralSeedTracker:SetSeed(id, seed, source)
+function ProceduralSeedTracker:SetSeed(
+    id,
+    seed,
+    source,
+    deferSave
+)
     ---@param seedMap MSD4RSeedMap
     ---@return boolean result1
     local function appendSeed(seedMap)
@@ -169,7 +229,7 @@ function ProceduralSeedTracker:SetSeed(id, seed, source)
         end
 
         local length = #seedMap[id]
-        if length >= 8 then
+        if length >= CONFIG.MAX_SEEDS_PER_ITEM then
             return false
         end
 
@@ -227,7 +287,9 @@ function ProceduralSeedTracker:SetSeed(id, seed, source)
     end
 
     appendSeed(self.PendingSeeds)
-    if appendSeed(self.ItemIDToSeeds) then
+    if appendSeed(self.ItemIDToSeeds) and
+        not deferSave
+    then
         self:Save()
     end
 end
@@ -250,240 +312,526 @@ function ProceduralSeedTracker:OnPostGetCollectible(
     )
 end
 
----@param pickup? EntityPickup
----@param phase? string
----@return nil # No return value.
-function ProceduralSeedTracker:OnPostPickupUpdate(pickup, phase)
-    if not pickup
-        or pickup.Variant ~= PickupVariant.PICKUP_COLLECTIBLE
+---@return integer count
+function ProceduralSeedTracker:CheckTrackingContext()
+    local runSeed = self:GetCurrentRunSeed()
+    local count = ProceduralItemManager.GetProceduralItemCount()
+
+    if self.RunSeed ~= runSeed then
+        self:Clear()
+        self.RunSeed = runSeed
+    end
+
+    if self.TrackingRunSeed ~= runSeed then
+        self:ResetObservations()
+        self.TrackingRunSeed = runSeed
+    elseif self.ObservedCount
+        and count < self.ObservedCount
     then
-        return
+        for itemID in pairs(self.ItemIDToSeeds) do
+            if -itemID - 1 >= count then
+                self.ItemIDToSeeds[itemID] = nil
+                self.PendingSeeds[itemID] = nil
+                self.SeedSources[itemID] = nil
+            end
+        end
+
+        self:ResetObservations()
+        self.TrackingRunSeed = runSeed
+        self:Save()
     end
 
-    local id = Utility.ConvertToID32(pickup.SubType)
-    if id >= 0
-        or id < -MAGIC_CONST.PROCEDURAL_ITEM_SURFACE_COUNT
-    then
-        return
-    end
+    self.ObservedCount = count
 
-    if not phase then
-        phase = "update"
-    end
-
-    local data = pickup:GetData()
-    local key = "MSD4RTMObservedID_" .. phase
-    if data[key] == id then
-        return
-    end
-
-    data[key] = id
-    self:SetSeed(
-        id,
-        pickup.DropSeed,
-        phase .. ".DropSeed"
-    )
-
-    local rng = pickup:GetDropRNG()
-    if rng then
-        self:SetSeed(
-            id,
-            rng:GetSeed(),
-            phase .. ".GetDropRNG"
-        )
-    end
+    return count
 end
 
----@param rng? RNG
----@param player? EntityPlayer
+---@param label string
+---@param missingAPIs string[]
 ---@return nil # No return value.
-function ProceduralSeedTracker:OnPreUseD4(rng, player)
-    if not player
-        or not rng
-    then
+function ProceduralSeedTracker:ReportMissingAPIs(
+    label,
+    missingAPIs
+)
+    if self.ReportedAPIErrors[label] then
         return
     end
 
-    local shift = rng:GetShiftIdx()
-    if not shift then
-        Isaac.DebugString("[MSD4R] D4 RNG shift index is unavailable.\n")
+    self.ReportedAPIErrors[label] = true
+    CoreAPI:ReportUnavailable(label, missingAPIs)
+end
 
-        return
-    end
-
-    ---@type MSD4RRerollWindow
-    local window = {
-        Seed = rng:GetSeed(),
-        Shift = shift,
-        Count = ProceduralItemManager.GetProceduralItemCount(),
-        RunSeed = self:GetCurrentRunSeed(),
-        Frame = game:GetFrameCount(),
-        Player = player
+---@param rng RNG
+---@param count integer
+---@return MSD4RSeedRNGSnapshot snapshot
+function ProceduralSeedTracker:GetRNGSnapshot(rng, count)
+    return {
+        Seed = self:NormalizeSeed(rng:GetSeed()),
+        Shift = rng:GetShiftIdx(),
+        Count = count,
+        RunSeed = self:GetCurrentRunSeed()
     }
-    local key = GetPtrHash(player)
+end
 
-    if not self.RerollWindows[key]
-        or (self.RerollWindows[key][1]
-            and self.RerollWindows[key][1].Frame ~= window.Frame)
-    then
-        self.RerollWindows[key] = {}
+---@param seeds integer[]
+---@return integer[] candidates
+function ProceduralSeedTracker:ExpandCandidateSeeds(seeds)
+    local candidates = {}
+    local visitedSeeds = {}
+
+    -- Try the native seed first, then try some next rng.
+    for steps = 0, CONFIG.SELECTION_SEED_STEPS do
+        for _, seed in ipairs(seeds) do
+            local candidate = self:NormalizeSeed(seed)
+            if candidate ~= 0 then
+                for _ = 1, steps do
+                    candidate = self:GetNextSelectionSeed(candidate)
+                end
+
+                if not visitedSeeds[candidate] then
+                    visitedSeeds[candidate] = true
+                    candidates[#candidates + 1] = candidate
+                end
+            end
+        end
     end
 
-    self.RerollWindows[key][#self.RerollWindows[key] + 1] = window
+    return candidates
 end
 
 ---@param firstIndex integer
 ---@param lastIndex integer
 ---@param seeds integer[]
----@return MSD4RMatchedSeed[] result1
+---@return MSD4RMatchedSeed[] matchedSeeds
 function ProceduralSeedTracker:MatchCreationSeeds(
     firstIndex,
     lastIndex,
     seeds
 )
-    ---@type MSD4RMatchedSeed[]
-    local matchedSeeds = {}
     ---@type MSD4RPendingItem[]
     local pendingItems = {}
+    ---@type MSD4RMatchedSeed[]
+    local matchedSeeds = {}
 
     for index = firstIndex, lastIndex - 1 do
-        local id = -index - 1
-        local item = Utility.GetRawProceduralItem(id)
-        if item then
-            pendingItems[#pendingItems + 1] = {
-                ID = id,
-                Snapshot = ReplayController:GetSnapshot(item)
-            }
+        local itemID = -index - 1
+        if not self.ValidatedSeeds[itemID] then
+            local item = Utility.GetRawProceduralItem(itemID)
+            if item then
+                pendingItems[#pendingItems + 1] = {
+                    ID = itemID,
+                    Snapshot = ReplayController:GetSnapshot(item)
+                }
+            end
         end
     end
 
-    if #pendingItems == 0 then
+    if #pendingItems == 0
+        or #seeds == 0
+    then
         return matchedSeeds
     end
 
-    local env = ReplayController:BuildEnvironment()
-
-    for _, seed in ipairs(seeds) do
-        local replayResult = ReplayController:Replay(
-            seed,
-            env,
-            0
-        )
-
-        for i, entry in ipairs(pendingItems) do
-            local valid, _, _ = ReplayController:ValidateSnapshot(
-                replayResult,
-                entry.Snapshot
+    local environment = ReplayController:BuildEnvironment()
+    for _, seed in ipairs(self:ExpandCandidateSeeds(seeds)) do
+        for _, flags in ipairs(CONFIG.CANDIDATE_FLAGS) do
+            local replayResult = ReplayController:Replay(
+                seed,
+                environment,
+                flags
             )
 
-            if valid then
-                matchedSeeds[#matchedSeeds + 1] = {
-                    ID = entry.ID,
-                    Seed = seed
-                }
-                table.remove(pendingItems, i)
+            for index = #pendingItems, 1, -1 do
+                local pendingItem = pendingItems[index]
+                local valid = ReplayController:ValidateSnapshot(
+                    replayResult,
+                    pendingItem.Snapshot
+                )
 
-                break
+                if valid then
+                    matchedSeeds[#matchedSeeds + 1] = {
+                        ID = pendingItem.ID,
+                        Seed = seed
+                    }
+                    table.remove(pendingItems, index)
+                end
             end
-        end
 
-        if #pendingItems == 0 then
-            break
+            if #pendingItems == 0 then
+                return matchedSeeds
+            end
         end
     end
 
     return matchedSeeds
 end
 
----@param window MSD4RRerollWindow
----@param rng RNG
----@return nil # No return value.
-function ProceduralSeedTracker:FinishD4(window, rng)
-    if window.RunSeed ~= self:GetCurrentRunSeed() then
-        return
-    end
-
-    local count = ProceduralItemManager.GetProceduralItemCount()
-    if count <= window.Count then
-        return
-    end
-
-    local seeds = {}
-    local terminalSeed = rng:GetSeed()
-    local replicatedRNG = RNG()
-    replicatedRNG:SetSeed(window.Seed, window.Shift)
-
-    while replicatedRNG:GetSeed() ~= terminalSeed
-        and #seeds < 16384
-    do
-        seeds[#seeds + 1] = replicatedRNG:Next()
-    end
-
-    if replicatedRNG:GetSeed() ~= terminalSeed then
-        Isaac.DebugString("D4 RNG window exceeded limit or was reset.")
-        return
-    end
-
-    local matchResult = self:MatchCreationSeeds(
-        window.Count,
-        count,
+---@param firstIndex integer
+---@param lastIndex integer
+---@param seeds integer[]
+---@param source string
+---@return integer matchedCount
+function ProceduralSeedTracker:CaptureValidatedSeeds(
+    firstIndex,
+    lastIndex,
+    seeds,
+    source
+)
+    local successful, matchedSeeds = pcall(
+        self.MatchCreationSeeds,
+        self,
+        firstIndex,
+        lastIndex,
         seeds
     )
-    for _, matchItem in ipairs(matchResult) do
+
+    if not successful then
+        local message = tostring(matchedSeeds)
+        if self.LastReplayError ~= message then
+            Utility.Log("Seed replay failed: " .. message .. ".")
+            self.LastReplayError = message
+        end
+
+        return 0
+    end
+
+    self.LastReplayError = nil
+
+    for _, matchedSeed in ipairs(matchedSeeds) do
+        -- A verified seed must not be crowded out by eight raw candidates.
+        self.ItemIDToSeeds[matchedSeed.ID] = {}
+        self.PendingSeeds[matchedSeed.ID] = {}
+        self.ValidatedSeeds[matchedSeed.ID] = matchedSeed.Seed
         self:SetSeed(
-            matchItem.ID,
-            matchItem.Seed,
-            "D4.RNGWindow.validated"
+            matchedSeed.ID,
+            matchedSeed.Seed,
+            source .. ".validated",
+            true
         )
     end
 
-    Isaac.ConsoleOutput(string.format(
-        "D4 captured=%d/%d rngSteps=%d ids=%d/%d.",
-        #matchResult,
-        count - window.Count,
-        #seeds,
-        -window.Count - 1,
-        -count
-    ))
+    if #matchedSeeds > 0 then
+        self:Save()
+    end
+
+    return #matchedSeeds
 end
 
----@param rng RNG
----@param player EntityPlayer
+---@param previousSnapshot MSD4RSeedRNGSnapshot
+---@param currentSnapshot MSD4RSeedRNGSnapshot
+---@param source string
 ---@return nil # No return value.
-function ProceduralSeedTracker:OnPostUseD4(rng, player)
-    local key = GetPtrHash(player)
-
-    if not self.RerollWindows[key]
-        or #self.RerollWindows[key] == 0
+function ProceduralSeedTracker:FinishRNGWindow(
+    previousSnapshot,
+    currentSnapshot,
+    source
+)
+    if previousSnapshot.RunSeed ~= currentSnapshot.RunSeed
+        or currentSnapshot.Count <= previousSnapshot.Count
+        or previousSnapshot.Seed == currentSnapshot.Seed
+        or previousSnapshot.Seed == 0
+        or currentSnapshot.Seed == 0
+        or previousSnapshot.Shift ~= currentSnapshot.Shift
     then
         return
     end
 
-    ---@type MSD4RRerollWindow
-    local window = table.remove(self.RerollWindows[key])
+    local replicatedRNG = RNG()
+    local seeds = {}
 
-    self:FinishD4(window, rng)
+    replicatedRNG:SetSeed(
+        previousSnapshot.Seed,
+        previousSnapshot.Shift
+    )
+
+    while replicatedRNG:GetSeed() ~= currentSnapshot.Seed
+        and #seeds < CONFIG.MAX_RNG_STEPS
+    do
+        seeds[#seeds + 1] = replicatedRNG:Next()
+    end
+
+    if replicatedRNG:GetSeed() ~= currentSnapshot.Seed then
+        Utility.Log("Seed tracker RNG was reset or exceeded the observation limit.")
+
+        return
+    end
+
+    self:CaptureValidatedSeeds(
+        previousSnapshot.Count,
+        currentSnapshot.Count,
+        seeds,
+        source
+    )
+end
+
+---@param player EntityPlayer
+---@param itemID integer
+---@param suppliedRNG? RNG
+---@return nil # No return value.
+function ProceduralSeedTracker:ObservePlayerRNG(
+    player,
+    itemID,
+    suppliedRNG
+)
+    local count = self:CheckTrackingContext()
+    local playerKey = GetPtrHash(player)
+    local observation = self.RerollWindows[playerKey]
+
+    if not observation then
+        local available, missingAPIs = CoreAPI:CheckSeedTrackingPlayer(player)
+        if not available then
+            self:ReportMissingAPIs("Player seed tracking", missingAPIs)
+
+            return
+        end
+
+        observation = {
+            Player = player,
+            Snapshots = {},
+            LastUsedFrames = {}
+        }
+        self.RerollWindows[playerKey] = observation
+    end
+
+    local rng = suppliedRNG or player:GetCollectibleRNG(itemID)
+    if not rng then
+        return
+    end
+
+    local currentSnapshot = self:GetRNGSnapshot(rng, count)
+    local previousSnapshot = observation.Snapshots[itemID]
+
+    observation.Snapshots[itemID] = currentSnapshot
+
+    if previousSnapshot then
+        self:FinishRNGWindow(
+            previousSnapshot,
+            currentSnapshot,
+            string.format(
+                "Player[%s].Collectible[%d].RNGWindow",
+                tostring(playerKey),
+                itemID
+            )
+        )
+    end
+end
+
+---@param player EntityPlayer
+---@return nil # No return value.
+function ProceduralSeedTracker:ObservePlayer(player)
+    self:ObservePlayerRNG(
+        player,
+        CollectibleType.COLLECTIBLE_D4
+    )
+end
+
+---@param itemID integer
+---@param randomGenerator RNG
+---@param player EntityPlayer
+---@return nil # No return value.
+function ProceduralSeedTracker:OnPreUseItem(
+    itemID,
+    randomGenerator,
+    player
+)
+    self:OnRerollUpdate()
+    self:ObservePlayer(player)
+    self:ObservePlayerRNG(
+        player,
+        itemID,
+        randomGenerator
+    )
+
+    local observation = self.RerollWindows[GetPtrHash(player)]
+    if observation then
+        observation.LastUsedFrames[itemID] = game:GetFrameCount()
+    end
+end
+
+---@param itemID integer
+---@param randomGenerator RNG
+---@param player EntityPlayer
+---@return nil # No return value.
+function ProceduralSeedTracker:OnPostUseItem(
+    itemID,
+    randomGenerator,
+    player
+)
+    self:ObservePlayerRNG(
+        player,
+        itemID,
+        randomGenerator
+    )
+    self:OnRerollUpdate()
+end
+
+---@param player EntityPlayer
+---@return nil # No return value.
+function ProceduralSeedTracker:OnBeforeReroll(player)
+    --[[
+    Damage and card callbacks needn't predict whether a re-roll will happen.
+    If it is cancelled, the next observation simply finds no new records.
+    ]]
+    self:OnRerollUpdate()
+    self:ObservePlayer(player)
+end
+
+---@param pickup EntityPickup
+---@return MSD4RPickupRNGObservation? observation
+function ProceduralSeedTracker:ObservePickupRNG(pickup)
+    local count = self:CheckTrackingContext()
+    local pickupKey = GetPtrHash(pickup)
+    local observation = self.PickupWindows[pickupKey]
+
+    if not observation then
+        local available, missingAPIs = CoreAPI:CheckSeedTrackingPickup(pickup)
+        if not available then
+            self:ReportMissingAPIs("Pickup seed tracking", missingAPIs)
+
+            return nil
+        end
+
+        observation = { Pickup = pickup }
+        self.PickupWindows[pickupKey] = observation
+    end
+
+    local rng = pickup:GetDropRNG()
+    if rng then
+        local currentSnapshot = self:GetRNGSnapshot(rng, count)
+        local previousSnapshot = observation.Snapshot
+
+        observation.Snapshot = currentSnapshot
+
+        if previousSnapshot then
+            self:FinishRNGWindow(
+                previousSnapshot,
+                currentSnapshot,
+                "Pickup.DropRNGWindow"
+            )
+        end
+    end
+
+    return observation
+end
+
+---@param pickup? EntityPickup
+---@param phase? string
+---@return nil # No return value.
+function ProceduralSeedTracker:OnPostPickupUpdate(
+    pickup,
+    phase
+)
+    if not pickup
+        or pickup.Variant ~= PickupVariant.PICKUP_COLLECTIBLE
+    then
+        return
+    end
+
+    local observation = self:ObservePickupRNG(pickup)
+    if not observation then
+        return
+    end
+
+    local itemID = Utility.ConvertToID32(pickup.SubType)
+    local dropSeed = self:NormalizeSeed(pickup.DropSeed)
+    local rngSeed = observation.Snapshot and observation.Snapshot.Seed or 0
+
+    if observation.ItemID == itemID
+        and observation.DropSeed == dropSeed
+        and observation.RNGSeed == rngSeed
+    then
+        return
+    end
+
+    observation.ItemID = itemID
+    observation.DropSeed = dropSeed
+    observation.RNGSeed = rngSeed
+
+    if itemID >= 0
+        or itemID < -MAGIC_CONST.PROCEDURAL_ITEM_SURFACE_COUNT
+    then
+        return
+    end
+
+    local source = phase or "update"
+
+    self:SetSeed(itemID, dropSeed, source .. ".DropSeed")
+    self:SetSeed(itemID, rngSeed, source .. ".GetDropRNG")
+
+    local index = -itemID - 1
+    self:CaptureValidatedSeeds(
+        index,
+        index + 1,
+        { dropSeed, rngSeed },
+        source
+    )
+end
+
+---@param pickup EntityPickup
+---@param entityType integer
+---@param variant integer
+---@return nil # No return value.
+function ProceduralSeedTracker:OnPrePickupMorph(
+    pickup,
+    entityType,
+    variant
+)
+    if pickup.Variant == PickupVariant.PICKUP_COLLECTIBLE
+        or (entityType == EntityType.ENTITY_PICKUP
+            and variant == PickupVariant.PICKUP_COLLECTIBLE)
+    then
+        self:ObservePickupRNG(pickup)
+    end
+end
+
+---@param pickup EntityPickup
+---@return nil # No return value.
+function ProceduralSeedTracker:OnPostPickupMorph(pickup)
+    self:OnPostPickupUpdate(pickup, "morph")
 end
 
 ---@return nil # No return value.
 function ProceduralSeedTracker:OnRerollUpdate()
-    local windows = self.RerollWindows
+    self:CheckTrackingContext()
 
-    self.RerollWindows = {}
+    for playerIndex = 0, game:GetNumPlayers() - 1 do
+        local player = Isaac.GetPlayer(playerIndex)
+        if player then
+            self:ObservePlayer(player)
+        end
+    end
 
-    for _, stack in pairs(windows) do
-        for i = #stack, 1, -1 do
-            local window = stack[i]
-            if window.RunSeed == self:GetCurrentRunSeed()
-                and window.Player:Exists()
-            then
-                self:FinishD4(
-                    window,
-                    window.Player:GetCollectibleRNG(
-                        CollectibleType.COLLECTIBLE_D4
-                    )
-                )
+    local frame = game:GetFrameCount()
+
+    for playerKey, observation in pairs(self.RerollWindows) do
+        local player = observation.Player
+        if not player:Exists() then
+            self.RerollWindows[playerKey] = nil
+        else
+            for itemID in pairs(observation.Snapshots) do
+                self:ObservePlayerRNG(player, itemID)
+
+                if itemID ~= CollectibleType.COLLECTIBLE_D4 then
+                    local lastUsedFrame = observation.LastUsedFrames[itemID]
+                    if not lastUsedFrame
+                        or frame - lastUsedFrame > CONFIG.ACTIVE_OBSERVATION_FRAMES
+                    then
+                        observation.Snapshots[itemID] = nil
+                        observation.LastUsedFrames[itemID] = nil
+                    end
+                end
             end
+        end
+    end
+
+    for pickupKey, observation in pairs(self.PickupWindows) do
+        local pickup = observation.Pickup
+        if not pickup:Exists()
+            or pickup.Variant ~= PickupVariant.PICKUP_COLLECTIBLE
+        then
+            self.PickupWindows[pickupKey] = nil
+        else
+            self:OnPostPickupUpdate(pickup)
         end
     end
 end
@@ -491,25 +839,27 @@ end
 ---@param isContinued boolean
 ---@return nil # No return value.
 function ProceduralSeedTracker:OnPostGameStarted(isContinued)
-    local run = self:GetCurrentRunSeed()
-    self.RerollWindows = {}
+    local runSeed = self:GetCurrentRunSeed()
 
-    if not isContinued
-        or self.RunSeed ~= run
-    then
+    if self.RunSeed ~= runSeed then
+        self:Clear()
+    elseif not isContinued then
         self.ItemIDToSeeds = self.PendingSeeds
     end
 
-    self.RunSeed = run
+    self.RunSeed = runSeed
     self.PendingSeeds = {}
+    self:ResetObservations()
+    self:OnRerollUpdate()
     self:Save()
 end
 
 ---@return nil # No return value.
 function ProceduralSeedTracker:OnPreGameExit()
+    self:OnRerollUpdate()
     self:Save()
     self.PendingSeeds = {}
-    self.RerollWindows = {}
+    self:ResetObservations()
 end
 
 ---@type MSD4RProceduralSeedTracker

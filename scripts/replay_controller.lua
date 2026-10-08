@@ -1094,8 +1094,11 @@ end
 ---@return string result2
 ---@return MSD4RDifferenceReport result3
 function ReplayController:ValidateSnapshot(replayResult, snapshot)
+    ---@type MSD4RDifferenceReport
     local differenceReport = {
-        ItemConfig = {},
+        ItemConfig = {
+            Effects = {}
+        },
         Differences = {},
         Checks = 0,
         MatchedCount = 0,

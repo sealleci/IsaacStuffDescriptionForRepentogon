@@ -560,6 +560,7 @@ function CoreAPI:CheckGlitchedRendering(game)
         Isaac,
         {
             "GetItemConfig",
+            "GetPlayer",
             "RenderCollectionItem"
         }
     )
@@ -593,7 +594,8 @@ function CoreAPI:CheckGlitchedRendering(game)
         game,
         {
             "GetSeeds",
-            "GetFrameCount"
+            "GetFrameCount",
+            "GetNumPlayers"
         }
     )
     self:CheckMethods(
@@ -621,24 +623,16 @@ function CoreAPI:CheckGlitchedRendering(game)
         {
             "MC_POST_PICKUP_INIT",
             "MC_POST_PICKUP_UPDATE",
+            "MC_PRE_PICKUP_MORPH",
+            "MC_POST_PICKUP_MORPH",
+            "MC_PRE_UPDATE",
+            "MC_POST_UPDATE",
             "MC_POST_GET_COLLECTIBLE",
             "MC_PRE_USE_ITEM",
             "MC_POST_GAME_STARTED",
             "MC_PRE_GAME_EXIT"
         }
     )
-
-    if type(self:GetMember(
-            ModCallbacks,
-            "MC_POST_USE_ITEM"
-        )) ~= "number" then
-        self:CheckConstants(
-            missingAPIs,
-            "ModCallbacks",
-            ModCallbacks,
-            { "MC_POST_UPDATE" }
-        )
-    end
 
     local rngCreated, rng = pcall(
     ---@return RNG result1
@@ -705,6 +699,40 @@ function CoreAPI:CheckGlitchedRendering(game)
         end
     end
 
+    return #missingAPIs == 0, missingAPIs
+end
+
+---@param player EntityPlayer
+---@return boolean available
+---@return string[] missingAPIs
+function CoreAPI:CheckSeedTrackingPlayer(player)
+    local missingAPIs = {}
+    self:CheckMethods(
+        missingAPIs,
+        "EntityPlayer",
+        player,
+        {
+            "Exists",
+            "GetCollectibleRNG"
+        }
+    )
+    return #missingAPIs == 0, missingAPIs
+end
+
+---@param pickup EntityPickup
+---@return boolean available
+---@return string[] missingAPIs
+function CoreAPI:CheckSeedTrackingPickup(pickup)
+    local missingAPIs = {}
+    self:CheckMethods(
+        missingAPIs,
+        "EntityPickup",
+        pickup,
+        {
+            "Exists",
+            "GetDropRNG"
+        }
+    )
     return #missingAPIs == 0, missingAPIs
 end
 
