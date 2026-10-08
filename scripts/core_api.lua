@@ -1,5 +1,6 @@
 ---@class MSD4RCoreAPI
 ---@field CheckedCoreInstances table<string, boolean>
+---@field ReportedMissingAPIs table<string, boolean>
 ---@field Initialized boolean?
 local CoreAPI = {}
 
@@ -31,6 +32,7 @@ function CoreAPI:Initialize()
     end
 
     self.CheckedCoreInstances = {}
+    self.ReportedMissingAPIs = {}
     self.Initialized = true
 end
 
@@ -109,11 +111,16 @@ end
 ---@param missingAPIs string[]
 ---@return nil # No return value.
 function CoreAPI:ReportUnavailable(featureName, missingAPIs)
+    if self.ReportedMissingAPIs[featureName] then
+        return
+    end
+
     Utility.Log(string.format(
         "%s APIs are unavailable: %s.",
         featureName,
         table.concat(missingAPIs, ", ")
     ))
+    self.ReportedMissingAPIs[featureName] = true
 end
 
 ---@param mod MSD4RMod
@@ -722,7 +729,7 @@ end
 ---@param pickup EntityPickup
 ---@return boolean available
 ---@return string[] missingAPIs
-function CoreAPI:CheckSeedTrackingPickup(pickup)
+function CoreAPI:CheckPickup(pickup)
     local missingAPIs = {}
     self:CheckMethods(
         missingAPIs,

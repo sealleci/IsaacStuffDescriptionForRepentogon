@@ -3,14 +3,10 @@
 ---@field RunSeed integer
 ---@field ItemIDToSeeds MSD4RSeedMap
 ---@field SeedSources MSD4RSeedSourceMap
----@field PendingSeeds MSD4RSeedMap
----@field RerollWindows table<integer, MSD4RPlayerRNGObservation>
+---@field RerollWindows table<integer, MSD4RItemRNGObservation>
 ---@field PickupWindows table<integer, MSD4RPickupRNGObservation>
 ---@field ValidatedSeeds table<integer, integer>
----@field TrackingRunSeed integer?
----@field ObservedCount integer?
----@field LastReplayError string?
----@field ReportedAPIErrors table<string, boolean>
+---@field ObservedProceduralItemCount integer?
 ---@field Initialized boolean?
 local ProceduralSeedTracker = {}
 
@@ -29,8 +25,7 @@ local CONFIG = {
     MAX_RNG_STEPS = 16384,
     MAX_SEEDS_PER_ITEM = 8,
     CANDIDATE_FLAGS = { 0, 8 },
-    SELECTION_SEED_STEPS = 2,
-    ACTIVE_OBSERVATION_FRAMES = 1
+    SELECTION_SEED_STEPS = 2
 }
 
 ---@type Game
@@ -87,16 +82,12 @@ function ProceduralSeedTracker:Initialize(mod)
     self.ModSave = mod.ModSave
     self.RunSeed = self:NormalizeSeed(self.ModSave:GetRunSeed())
     self.ItemIDToSeeds = {}
-    self.PendingSeeds = {}
     self.SeedSources = {}
 
     self.RerollWindows = {}
     self.PickupWindows = {}
     self.ValidatedSeeds = {}
-    self.TrackingRunSeed = nil
-    self.ObservedCount = nil
-    self.LastReplayError = nil
-    self.ReportedAPIErrors = {}
+    self.ObservedProceduralItemCount = nil
 
     self:UpdateProceduralSeeds()
     self.Initialized = true
@@ -107,17 +98,14 @@ function ProceduralSeedTracker:ResetObservations()
     self.RerollWindows = {}
     self.PickupWindows = {}
     self.ValidatedSeeds = {}
-    self.TrackingRunSeed = nil
-    self.ObservedCount = nil
-    self.LastReplayError = nil
-    self.ReportedAPIErrors = {}
+    self.ObservedProceduralItemCount = nil
 end
 
 ---@return nil # No return value.
 function ProceduralSeedTracker:Clear()
     self.ItemIDToSeeds = {}
     self.SeedSources = {}
-    self.PendingSeeds = {}
+
     self:ResetObservations()
 end
 
@@ -262,7 +250,6 @@ function ProceduralSeedTracker:SetSeed(
     if self.RunSeed ~= runSeed then
         self.RunSeed = runSeed
         self.ItemIDToSeeds = {}
-        self.PendingSeeds = {}
         self.SeedSources = {}
     end
 
@@ -286,64 +273,11 @@ function ProceduralSeedTracker:SetSeed(
         self.SeedSources[id][key][#self.SeedSources[id][key] + 1] = source
     end
 
-    appendSeed(self.PendingSeeds)
     if appendSeed(self.ItemIDToSeeds) and
         not deferSave
     then
         self:Save()
     end
-end
-
----@param selected integer
----@param pool integer
----@param decrease boolean
----@param seed integer
----@return nil # No return value.
-function ProceduralSeedTracker:OnPostGetCollectible(
-    selected,
-    pool,
-    decrease,
-    seed
-)
-    self:SetSeed(
-        selected,
-        seed,
-        "MC_POST_GET_COLLECTIBLE"
-    )
-end
-
----@return integer count
-function ProceduralSeedTracker:CheckTrackingContext()
-    local runSeed = self:GetCurrentRunSeed()
-    local count = ProceduralItemManager.GetProceduralItemCount()
-
-    if self.RunSeed ~= runSeed then
-        self:Clear()
-        self.RunSeed = runSeed
-    end
-
-    if self.TrackingRunSeed ~= runSeed then
-        self:ResetObservations()
-        self.TrackingRunSeed = runSeed
-    elseif self.ObservedCount
-        and count < self.ObservedCount
-    then
-        for itemID in pairs(self.ItemIDToSeeds) do
-            if -itemID - 1 >= count then
-                self.ItemIDToSeeds[itemID] = nil
-                self.PendingSeeds[itemID] = nil
-                self.SeedSources[itemID] = nil
-            end
-        end
-
-        self:ResetObservations()
-        self.TrackingRunSeed = runSeed
-        self:Save()
-    end
-
-    self.ObservedCount = count
-
-    return count
 end
 
 ---@param label string
@@ -353,11 +287,6 @@ function ProceduralSeedTracker:ReportMissingAPIs(
     label,
     missingAPIs
 )
-    if self.ReportedAPIErrors[label] then
-        return
-    end
-
-    self.ReportedAPIErrors[label] = true
     CoreAPI:ReportUnavailable(label, missingAPIs)
 end
 
@@ -432,12 +361,12 @@ function ProceduralSeedTracker:MatchCreationSeeds(
         return matchedSeeds
     end
 
-    local environment = ReplayController:BuildEnvironment()
+    local env = ReplayController:BuildEnvironment()
     for _, seed in ipairs(self:ExpandCandidateSeeds(seeds)) do
         for _, flags in ipairs(CONFIG.CANDIDATE_FLAGS) do
             local replayResult = ReplayController:Replay(
                 seed,
-                environment,
+                env,
                 flags
             )
 
@@ -471,13 +400,13 @@ end
 ---@param seeds integer[]
 ---@param source string
 ---@return integer matchedCount
-function ProceduralSeedTracker:CaptureValidatedSeeds(
+function ProceduralSeedTracker:ValidateSeeds(
     firstIndex,
     lastIndex,
     seeds,
     source
 )
-    local successful, matchedSeeds = pcall(
+    local successful, matchedSeedsOrError = pcall(
         self.MatchCreationSeeds,
         self,
         firstIndex,
@@ -486,21 +415,17 @@ function ProceduralSeedTracker:CaptureValidatedSeeds(
     )
 
     if not successful then
-        local message = tostring(matchedSeeds)
-        if self.LastReplayError ~= message then
-            Utility.Log("Seed replay failed: " .. message .. ".")
-            self.LastReplayError = message
-        end
+        Utility.Log(
+            "Seed replay failed: "
+            .. tostring(matchedSeedsOrError)
+            .. "."
+        )
 
         return 0
     end
 
-    self.LastReplayError = nil
-
-    for _, matchedSeed in ipairs(matchedSeeds) do
-        -- A verified seed must not be crowded out by eight raw candidates.
+    for _, matchedSeed in ipairs(matchedSeedsOrError) do
         self.ItemIDToSeeds[matchedSeed.ID] = {}
-        self.PendingSeeds[matchedSeed.ID] = {}
         self.ValidatedSeeds[matchedSeed.ID] = matchedSeed.Seed
         self:SetSeed(
             matchedSeed.ID,
@@ -510,18 +435,18 @@ function ProceduralSeedTracker:CaptureValidatedSeeds(
         )
     end
 
-    if #matchedSeeds > 0 then
+    if #matchedSeedsOrError > 0 then
         self:Save()
     end
 
-    return #matchedSeeds
+    return #matchedSeedsOrError
 end
 
 ---@param previousSnapshot MSD4RSeedRNGSnapshot
 ---@param currentSnapshot MSD4RSeedRNGSnapshot
 ---@param source string
 ---@return nil # No return value.
-function ProceduralSeedTracker:FinishRNGWindow(
+function ProceduralSeedTracker:RecurRNGChange(
     previousSnapshot,
     currentSnapshot,
     source
@@ -529,9 +454,9 @@ function ProceduralSeedTracker:FinishRNGWindow(
     if previousSnapshot.RunSeed ~= currentSnapshot.RunSeed
         or currentSnapshot.Count <= previousSnapshot.Count
         or previousSnapshot.Seed == currentSnapshot.Seed
+        or previousSnapshot.Shift ~= currentSnapshot.Shift
         or previousSnapshot.Seed == 0
         or currentSnapshot.Seed == 0
-        or previousSnapshot.Shift ~= currentSnapshot.Shift
     then
         return
     end
@@ -556,7 +481,7 @@ function ProceduralSeedTracker:FinishRNGWindow(
         return
     end
 
-    self:CaptureValidatedSeeds(
+    self:ValidateSeeds(
         previousSnapshot.Count,
         currentSnapshot.Count,
         seeds,
@@ -564,16 +489,45 @@ function ProceduralSeedTracker:FinishRNGWindow(
     )
 end
 
+---@return integer proceduralItemCount
+function ProceduralSeedTracker:PrepareObservation()
+    local runSeed = self:GetCurrentRunSeed()
+    local count = ProceduralItemManager.GetProceduralItemCount()
+
+    if self.RunSeed ~= runSeed then
+        self:Clear()
+        self.RunSeed = runSeed
+    end
+
+    if self.ObservedProceduralItemCount
+        and count < self.ObservedProceduralItemCount
+    then
+        for itemID in pairs(self.ItemIDToSeeds) do
+            if -itemID - 1 >= count then
+                self.ItemIDToSeeds[itemID] = nil
+                self.SeedSources[itemID] = nil
+            end
+        end
+
+        self:ResetObservations()
+        self:Save()
+    end
+
+    self.ObservedProceduralItemCount = count
+
+    return count
+end
+
 ---@param player EntityPlayer
 ---@param itemID integer
 ---@param suppliedRNG? RNG
 ---@return nil # No return value.
-function ProceduralSeedTracker:ObservePlayerRNG(
+function ProceduralSeedTracker:ObserveItemRNG(
     player,
     itemID,
     suppliedRNG
 )
-    local count = self:CheckTrackingContext()
+    local proceduralItemCount = self:PrepareObservation()
     local playerKey = GetPtrHash(player)
     local observation = self.RerollWindows[playerKey]
 
@@ -598,13 +552,13 @@ function ProceduralSeedTracker:ObservePlayerRNG(
         return
     end
 
-    local currentSnapshot = self:GetRNGSnapshot(rng, count)
+    local currentSnapshot = self:GetRNGSnapshot(rng, proceduralItemCount)
     local previousSnapshot = observation.Snapshots[itemID]
 
     observation.Snapshots[itemID] = currentSnapshot
 
     if previousSnapshot then
-        self:FinishRNGWindow(
+        self:RecurRNGChange(
             previousSnapshot,
             currentSnapshot,
             string.format(
@@ -618,73 +572,22 @@ end
 
 ---@param player EntityPlayer
 ---@return nil # No return value.
-function ProceduralSeedTracker:ObservePlayer(player)
-    self:ObservePlayerRNG(
+function ProceduralSeedTracker:ObserveD4RNG(player)
+    self:ObserveItemRNG(
         player,
         CollectibleType.COLLECTIBLE_D4
     )
 end
 
----@param itemID integer
----@param randomGenerator RNG
----@param player EntityPlayer
----@return nil # No return value.
-function ProceduralSeedTracker:OnPreUseItem(
-    itemID,
-    randomGenerator,
-    player
-)
-    self:OnRerollUpdate()
-    self:ObservePlayer(player)
-    self:ObservePlayerRNG(
-        player,
-        itemID,
-        randomGenerator
-    )
-
-    local observation = self.RerollWindows[GetPtrHash(player)]
-    if observation then
-        observation.LastUsedFrames[itemID] = game:GetFrameCount()
-    end
-end
-
----@param itemID integer
----@param randomGenerator RNG
----@param player EntityPlayer
----@return nil # No return value.
-function ProceduralSeedTracker:OnPostUseItem(
-    itemID,
-    randomGenerator,
-    player
-)
-    self:ObservePlayerRNG(
-        player,
-        itemID,
-        randomGenerator
-    )
-    self:OnRerollUpdate()
-end
-
----@param player EntityPlayer
----@return nil # No return value.
-function ProceduralSeedTracker:OnBeforeReroll(player)
-    --[[
-    Damage and card callbacks needn't predict whether a re-roll will happen.
-    If it is cancelled, the next observation simply finds no new records.
-    ]]
-    self:OnRerollUpdate()
-    self:ObservePlayer(player)
-end
-
 ---@param pickup EntityPickup
 ---@return MSD4RPickupRNGObservation? observation
 function ProceduralSeedTracker:ObservePickupRNG(pickup)
-    local count = self:CheckTrackingContext()
+    local count = self:PrepareObservation()
     local pickupKey = GetPtrHash(pickup)
     local observation = self.PickupWindows[pickupKey]
 
     if not observation then
-        local available, missingAPIs = CoreAPI:CheckSeedTrackingPickup(pickup)
+        local available, missingAPIs = CoreAPI:CheckPickup(pickup)
         if not available then
             self:ReportMissingAPIs("Pickup seed tracking", missingAPIs)
 
@@ -703,7 +606,7 @@ function ProceduralSeedTracker:ObservePickupRNG(pickup)
         observation.Snapshot = currentSnapshot
 
         if previousSnapshot then
-            self:FinishRNGWindow(
+            self:RecurRNGChange(
                 previousSnapshot,
                 currentSnapshot,
                 "Pickup.DropRNGWindow"
@@ -734,7 +637,15 @@ function ProceduralSeedTracker:OnPostPickupUpdate(
 
     local itemID = Utility.ConvertToID32(pickup.SubType)
     local dropSeed = self:NormalizeSeed(pickup.DropSeed)
-    local rngSeed = observation.Snapshot and observation.Snapshot.Seed or 0
+    local rngSeed = observation.Snapshot
+        and observation.Snapshot.Seed
+        or 0
+
+    if itemID >= 0
+        or itemID < -MAGIC_CONST.PROCEDURAL_ITEM_SURFACE_COUNT
+    then
+        return
+    end
 
     if observation.ItemID == itemID
         and observation.DropSeed == dropSeed
@@ -747,23 +658,81 @@ function ProceduralSeedTracker:OnPostPickupUpdate(
     observation.DropSeed = dropSeed
     observation.RNGSeed = rngSeed
 
-    if itemID >= 0
-        or itemID < -MAGIC_CONST.PROCEDURAL_ITEM_SURFACE_COUNT
-    then
-        return
-    end
-
     local source = phase or "update"
 
     self:SetSeed(itemID, dropSeed, source .. ".DropSeed")
     self:SetSeed(itemID, rngSeed, source .. ".GetDropRNG")
 
     local index = -itemID - 1
-    self:CaptureValidatedSeeds(
+    self:ValidateSeeds(
         index,
         index + 1,
         { dropSeed, rngSeed },
         source
+    )
+end
+
+---@param selected integer
+---@param pool integer
+---@param decrease boolean
+---@param seed integer
+---@return nil # No return value.
+function ProceduralSeedTracker:OnPostGetItem(
+    selected,
+    pool,
+    decrease,
+    seed
+)
+    self:SetSeed(
+        selected,
+        seed,
+        "MC_POST_GET_COLLECTIBLE"
+    )
+end
+
+---@param itemID integer
+---@param rng RNG
+---@param player EntityPlayer
+---@return nil # No return value.
+function ProceduralSeedTracker:OnPreUseItem(
+    itemID,
+    rng,
+    player
+)
+    -- Other active items may call D4 function to re-roll.
+    if itemID ~= CollectibleType.COLLECTIBLE_D4 then
+        self:ObserveD4RNG(player)
+    end
+
+    self:ObserveItemRNG(
+        player,
+        itemID,
+        rng
+    )
+
+    local observation = self.RerollWindows[GetPtrHash(player)]
+    if observation then
+        observation.LastUsedFrames[itemID] = game:GetFrameCount()
+    end
+end
+
+---@param itemID integer
+---@param rng RNG
+---@param player EntityPlayer
+---@return nil # No return value.
+function ProceduralSeedTracker:OnPostUseItem(
+    itemID,
+    rng,
+    player
+)
+    if itemID ~= CollectibleType.COLLECTIBLE_D4 then
+        self:ObserveD4RNG(player)
+    end
+
+    self:ObserveItemRNG(
+        player,
+        itemID,
+        rng
     )
 end
 
@@ -790,75 +759,24 @@ function ProceduralSeedTracker:OnPostPickupMorph(pickup)
     self:OnPostPickupUpdate(pickup, "morph")
 end
 
----@return nil # No return value.
-function ProceduralSeedTracker:OnRerollUpdate()
-    self:CheckTrackingContext()
-
-    for playerIndex = 0, game:GetNumPlayers() - 1 do
-        local player = Isaac.GetPlayer(playerIndex)
-        if player then
-            self:ObservePlayer(player)
-        end
-    end
-
-    local frame = game:GetFrameCount()
-
-    for playerKey, observation in pairs(self.RerollWindows) do
-        local player = observation.Player
-        if not player:Exists() then
-            self.RerollWindows[playerKey] = nil
-        else
-            for itemID in pairs(observation.Snapshots) do
-                self:ObservePlayerRNG(player, itemID)
-
-                if itemID ~= CollectibleType.COLLECTIBLE_D4 then
-                    local lastUsedFrame = observation.LastUsedFrames[itemID]
-                    if not lastUsedFrame
-                        or frame - lastUsedFrame > CONFIG.ACTIVE_OBSERVATION_FRAMES
-                    then
-                        observation.Snapshots[itemID] = nil
-                        observation.LastUsedFrames[itemID] = nil
-                    end
-                end
-            end
-        end
-    end
-
-    for pickupKey, observation in pairs(self.PickupWindows) do
-        local pickup = observation.Pickup
-        if not pickup:Exists()
-            or pickup.Variant ~= PickupVariant.PICKUP_COLLECTIBLE
-        then
-            self.PickupWindows[pickupKey] = nil
-        else
-            self:OnPostPickupUpdate(pickup)
-        end
-    end
-end
-
 ---@param isContinued boolean
 ---@return nil # No return value.
 function ProceduralSeedTracker:OnPostGameStarted(isContinued)
     local runSeed = self:GetCurrentRunSeed()
 
-    if self.RunSeed ~= runSeed then
+    if self.RunSeed ~= runSeed
+        or not isContinued
+    then
         self:Clear()
-    elseif not isContinued then
-        self.ItemIDToSeeds = self.PendingSeeds
     end
 
     self.RunSeed = runSeed
-    self.PendingSeeds = {}
-    self:ResetObservations()
-    self:OnRerollUpdate()
     self:Save()
 end
 
 ---@return nil # No return value.
 function ProceduralSeedTracker:OnPreGameExit()
-    self:OnRerollUpdate()
     self:Save()
-    self.PendingSeeds = {}
     self:ResetObservations()
 end
 

@@ -76,7 +76,6 @@ Project types use an MSD4R prefix to avoid collisions.
 ---@field MAX_SEEDS_PER_ITEM integer
 ---@field CANDIDATE_FLAGS integer[]
 ---@field SELECTION_SEED_STEPS integer
----@field ACTIVE_OBSERVATION_FRAMES integer
 
 ---@class MSD4RSeedRNGSnapshot
 ---@field Seed integer
@@ -84,7 +83,7 @@ Project types use an MSD4R prefix to avoid collisions.
 ---@field Count integer
 ---@field RunSeed integer
 
----@class MSD4RPlayerRNGObservation
+---@class MSD4RItemRNGObservation
 ---@field Player EntityPlayer
 ---@field Snapshots table<integer, MSD4RSeedRNGSnapshot>
 ---@field LastUsedFrames table<integer, integer>

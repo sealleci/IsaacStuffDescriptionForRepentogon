@@ -121,10 +121,6 @@ function MSD4R:OnPrePauseScreenRender(
         return
     end
 
-    if self.GlitchedRenderingAvailable then
-        ProceduralSeedTracker:OnRerollUpdate()
-    end
-
     PauseMenuController:OnPrePauseScreenRender(
         pauseBody,
         pauseStats
@@ -214,7 +210,7 @@ function MSD4R:OnPostPickupInit(pickup)
         return
     end
 
-    ProceduralSeedTracker:OnPostPickupUpdate(pickup, 'init')
+    ProceduralSeedTracker:OnPostPickupUpdate(pickup, "init")
 end
 
 MSD4R:RegisterAvailableCallback(
@@ -258,7 +254,7 @@ function MSD4R:OnPostGetCollectible(
         return
     end
 
-    ProceduralSeedTracker:OnPostGetCollectible(
+    ProceduralSeedTracker:OnPostGetItem(
         selected,
         pool,
         decrease,
@@ -325,27 +321,6 @@ MSD4R:RegisterAvailableCallback(
     MSD4R.OnPostUseItem
 )
 
----@return nil # No return value.
-function MSD4R:OnSeedTrackingUpdate()
-    if not self.Enabled
-        or not self.GlitchedRenderingAvailable
-    then
-        return
-    end
-
-    ProceduralSeedTracker:OnRerollUpdate()
-end
-
-MSD4R:RegisterAvailableCallback(
-    ModCallbacks.MC_PRE_UPDATE,
-    MSD4R.OnSeedTrackingUpdate
-)
-
-MSD4R:RegisterAvailableCallback(
-    ModCallbacks.MC_POST_UPDATE,
-    MSD4R.OnSeedTrackingUpdate
-)
-
 ---@param player EntityPlayer
 ---@return nil # No return value.
 function MSD4R:OnPrePlayerTakeDamage(player)
@@ -355,7 +330,7 @@ function MSD4R:OnPrePlayerTakeDamage(player)
         return
     end
 
-    ProceduralSeedTracker:OnBeforeReroll(player)
+    ProceduralSeedTracker:ObserveD4RNG(player)
 end
 
 MSD4R:RegisterAvailableCallback(
@@ -363,25 +338,27 @@ MSD4R:RegisterAvailableCallback(
     MSD4R.OnPrePlayerTakeDamage
 )
 
----@param cardID integer
----@param player EntityPlayer
+---@param entity Entity
 ---@return nil # No return value.
-function MSD4R:OnPreUseCard(
-    cardID,
-    player
-)
+function MSD4R:OnPostPlayerTakeDamage(entity)
     if not self.Enabled
         or not self.GlitchedRenderingAvailable
     then
         return
     end
 
-    ProceduralSeedTracker:OnBeforeReroll(player)
+    local player = entity:ToPlayer()
+    if not player then
+        return
+    end
+
+    ProceduralSeedTracker:ObserveD4RNG(player)
 end
 
 MSD4R:RegisterAvailableCallback(
-    ModCallbacks.MC_PRE_USE_CARD,
-    MSD4R.OnPreUseCard
+    ModCallbacks.MC_POST_ENTITY_TAKE_DMG,
+    MSD4R.OnPostPlayerTakeDamage,
+    EntityType.ENTITY_PLAYER
 )
 
 ---@param player EntityPlayer
@@ -393,7 +370,7 @@ function MSD4R:OnPostPlayerInit(player)
         return
     end
 
-    ProceduralSeedTracker:ObservePlayer(player)
+    ProceduralSeedTracker:ObserveD4RNG(player)
 end
 
 MSD4R:RegisterAvailableCallback(
@@ -490,8 +467,6 @@ function MSD4R:OnExecuteCommand(command, params)
     end
 
     if command == "msd4r_tm" then
-        ProceduralSeedTracker:OnRerollUpdate()
-
         local itemID = params:match("^%s*(-?%d+)%s*$")
         itemID = tonumber(itemID)
 
